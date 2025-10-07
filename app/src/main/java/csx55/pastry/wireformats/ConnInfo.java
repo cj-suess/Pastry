@@ -2,12 +2,12 @@ package csx55.pastry.wireformats;
 
 import java.util.Objects;
 
-public class NodeID implements Comparable<NodeID> {
+public class ConnInfo implements Comparable<ConnInfo> {
     
     private final String ip;
     private final int port;
 
-    public NodeID(String ip, int port){
+    public ConnInfo(String ip, int port){
         this.ip = ip;
         this.port = port;
     }
@@ -15,8 +15,8 @@ public class NodeID implements Comparable<NodeID> {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || !(o instanceof NodeID)) return false;
-        NodeID nodeID = (NodeID) o;
+        if (o == null || !(o instanceof ConnInfo)) return false;
+        ConnInfo nodeID = (ConnInfo) o;
         return port == nodeID.port && ip.equals(nodeID.ip);
     }
 
@@ -26,7 +26,7 @@ public class NodeID implements Comparable<NodeID> {
     }
 
     @Override
-    public int compareTo(NodeID o) {
+    public int compareTo(ConnInfo o) {
         int ip = this.ip.compareTo(o.ip);
         if(ip != 0) {
             return ip;

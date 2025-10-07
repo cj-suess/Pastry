@@ -7,13 +7,11 @@ import java.io.IOException;
 public class Deregister implements Event {
 
     public int messageType;
-    public String ip;
-    public int port;
+    public ConnInfo connInfo;
 
-    public Deregister(int messageType, String ip, int port) {
+    public Deregister(int messageType, ConnInfo connInfo) {
         this.messageType = messageType;
-        this.ip = ip;
-        this.port = port;
+        this.connInfo = connInfo;
     }
 
     @Override
@@ -23,12 +21,14 @@ public class Deregister implements Event {
         DataOutputStream dout = new DataOutputStream(baos);
         dout.writeInt(messageType);
 
-        byte[] ipBytes = ip.getBytes();
+        /* FILL IN REQURED MARSHALING */
+        byte[] ipBytes = connInfo.getIP().getBytes();
         int ipLength = ipBytes.length;
         dout.writeInt(ipLength);
         dout.write(ipBytes);
-
-        dout.writeInt(port);
+        dout.writeInt(connInfo.getPort());
+        /*                             */
+        
         dout.flush();
         encodedData = baos.toByteArray();
         

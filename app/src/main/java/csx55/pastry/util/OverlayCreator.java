@@ -4,23 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import csx55.pastry.wireformats.NodeID;
+import csx55.pastry.wireformats.ConnInfo;
 import java.util.logging.*;
 
 public class OverlayCreator {
 
     private final static Logger log = Logger.getLogger(OverlayCreator.class.getName());
 
-    private List<NodeID> nodes;
-    private Map<NodeID, List<NodeID>> overlay = new ConcurrentHashMap<>();
+    private List<ConnInfo> nodes;
+    private Map<ConnInfo, List<ConnInfo>> overlay = new ConcurrentHashMap<>();
 
     public OverlayCreator(){}
 
-    public OverlayCreator(List<NodeID> nodes){
+    public OverlayCreator(List<ConnInfo> nodes){
         this.nodes = nodes;
     }
 
-    public Map<NodeID, List<NodeID>> buildRing() {
+    public Map<ConnInfo, List<ConnInfo>> buildRing() {
         log.info("Building overlay...");
         int n = nodes.size();
         for(int i = 0; i < n; i++) {

@@ -11,9 +11,9 @@ public class Overlay implements Event {
     public int messageType;
     public int numNodes;
     public int numConnections;
-    public Map<NodeID, List<NodeID>> overlay;
+    public Map<ConnInfo, List<ConnInfo>> overlay;
 
-    public Overlay(int messageType, int numNodes, int numConnections, Map<NodeID, List<NodeID>> overlay) {
+    public Overlay(int messageType, int numNodes, int numConnections, Map<ConnInfo, List<ConnInfo>> overlay) {
         this.messageType = messageType;
         this.numNodes = numNodes;
         this.numConnections = numConnections;
@@ -44,14 +44,14 @@ public class Overlay implements Event {
     }
 
     // method to write each String -> List mapping
-    private void writeMappings(DataOutputStream dout, Map<NodeID, List<NodeID>> overlay) throws IOException {
-        for(Map.Entry<NodeID, List<NodeID>> entry : overlay.entrySet()) {
+    private void writeMappings(DataOutputStream dout, Map<ConnInfo, List<ConnInfo>> overlay) throws IOException {
+        for(Map.Entry<ConnInfo, List<ConnInfo>> entry : overlay.entrySet()) {
             byte[] ipBytes = entry.getKey().getIP().getBytes();
             int ipLength = ipBytes.length;
             dout.writeInt(ipLength);
             dout.write(ipBytes);
             dout.writeInt(entry.getKey().getPort());
-            for(NodeID node : entry.getValue()) {
+            for(ConnInfo node : entry.getValue()) {
                 ipBytes = node.getIP().getBytes();
                 ipLength = ipBytes.length;
                 dout.writeInt(ipLength);
