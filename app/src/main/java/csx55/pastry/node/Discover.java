@@ -3,6 +3,7 @@ package csx55.pastry.node;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.*;
 
 import csx55.pastry.transport.TCPConnection;
@@ -18,6 +19,7 @@ public class Discover implements Node {
     private boolean running = true;
 
     private List<TCPConnection> openConnections = new ArrayList<>();
+    private Map<PeerInfo, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
 
     public Discover(int port) {
         this.port = port;

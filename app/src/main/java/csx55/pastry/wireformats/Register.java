@@ -7,11 +7,11 @@ import java.io.IOException;
 public class Register implements Event, Protocol {
 
     public int messageType;
-    public ConnInfo connInfo;
+    public PeerInfo peerInfo;
 
-    public Register(int messageType, ConnInfo connInfo) {
+    public Register(int messageType, PeerInfo peerInfo) {
         this.messageType = messageType;
-        this.connInfo = connInfo;
+        this.peerInfo = peerInfo;
     }
 
     @Override
@@ -22,11 +22,11 @@ public class Register implements Event, Protocol {
         dout.writeInt(messageType);
 
         /* FILL IN REQURED MARSHALING */
-        byte[] ipBytes = connInfo.getIP().getBytes();
+        byte[] ipBytes = peerInfo.getIP().getBytes();
         int ipLength = ipBytes.length;
         dout.writeInt(ipLength);
         dout.write(ipBytes);
-        dout.writeInt(connInfo.getPort());
+        dout.writeInt(peerInfo.getPort());
         /*              
          * 
                      */

@@ -19,4 +19,12 @@ public class PeerInfo {
     public void setHexID(String hexID) {
         this.hexID = hexID;
     }
+
+    public String getIP() {
+        return conn.getIP();
+    }
+
+    public int getPort() {
+        return conn.getPort();
+    }
 }
