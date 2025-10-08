@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.*;
 
 import csx55.pastry.transport.TCPConnection;
+import csx55.pastry.transport.TCPSender;
 import csx55.pastry.util.LogConfig;
 import csx55.pastry.wireformats.*;
 
@@ -27,7 +28,18 @@ public class Discover implements Node {
 
     @Override
     public void onEvent(Event event, Socket socket) {
-        
+        TCPSender sender = getSender(openConnections, socket);
+        if(event.getType() == Protocol.REGISTER_REQUEST) {
+            log.info("Register request detected. Checking status...");
+            Register registerEvent = (Register) event;
+            if (!peerToConnMap.containsKey(registerEvent.peerInfo)) {
+                sendRegisterSuccess(registerEvent, sender, socket);
+            }
+            else {
+                sendRegisterFailure(registerEvent, sender);
+            }
+        }
+
     }
 
     public void readTerminal() {
@@ -59,6 +71,52 @@ public class Discover implements Node {
         } catch(IOException e) {
             log.warning("Exception while accepting connections..." + e.getStackTrace());
         }
+    }
+
+    private TCPSender getSender(List<TCPConnection> openConnections, Socket socket) {
+        TCPSender sender = null;
+        for(TCPConnection conn : openConnections) {
+            if(socket == conn.socket) {
+                sender = conn.sender;
+            }
+        }
+        return sender;
+    }
+
+    private void sendRegisterSuccess(Register registerEvent, TCPSender sender, Socket socket) {
+        try {
+            TCPConnection conn = getConnectionBySocket(openConnections, socket);
+            peerToConnMap.put(registerEvent.peerInfo, conn);
+            log.info(() -> "New node was added to the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
+            String info = "Registration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
+            Message successMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)0, info);
+            log.info(() -> "Sending success response to messaging node at " + registerEvent.peerInfo.conn.toString());
+            sender.sendData(successMessage.getBytes());
+        } catch(IOException e) {
+            log.warning("Exception while registering compute node..." + e.getStackTrace());
+        }
+    }
+
+    private void sendRegisterFailure(Register registerEvent, TCPSender sender) {
+        try {
+            if(peerToConnMap.containsKey(registerEvent.peerInfo)) {
+                log.info(() -> "Cannot register node. A matching nodeID already exists in the registry...");
+                String info = "Registration request failed.";
+                Message failureMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)1, info);
+                sender.sendData(failureMessage.getBytes());
+            }
+        } catch(IOException e) {
+            log.warning("Exception while registering compute node..." + e.getStackTrace());
+        }
+    }
+
+    private TCPConnection getConnectionBySocket(List<TCPConnection> openConnections, Socket socket) {
+        for(TCPConnection conn : openConnections) {
+            if(conn.socket == socket) {
+                return conn;
+            }
+        }
+        return null;
     }
 
     // store registered nodes (16-bit identifier, NodeID, nickname)

@@ -1,10 +1,9 @@
 package csx55.pastry.wireformats;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-public class Message implements Event {
+public class Message extends Event {
     
     public int messageType;
     public byte statusCode;
@@ -17,29 +16,14 @@ public class Message implements Event {
     }
 
     @Override
-    public byte[] getBytes() throws IOException {
-        byte[] encodedData = null;
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(baos);
-        
-        dout.writeInt(messageType);
-        dout.writeByte(statusCode);
-        byte[] infoBytes = info.getBytes();
-        int infoLength = infoBytes.length;
-        dout.writeInt(infoLength);
-        dout.write(infoBytes);
-
-        dout.flush();
-        encodedData = baos.toByteArray();
-        
-        baos.close();
-        dout.close();
-        return encodedData;
+    public int getType() {
+        return messageType;
     }
 
     @Override
-    public int getType() {
-        return messageType;
+    void marshalData(DataOutputStream dout) throws IOException {
+        dout.writeByte(statusCode);
+        writeString(dout, info);
     }
     
 }
