@@ -42,7 +42,14 @@ public class Peer implements Node {
 
     @Override
     public void onEvent(Event event, Socket socket) {
-        
+        if(event == null) {
+            log.warning("Null event received from Event Factory...");
+        }
+        else if(event.getType() == Protocol.REGISTER_RESPONSE) {
+            log.info("Received register response from Registry...");
+            Message responseEvent = (Message) event; 
+            System.out.println(responseEvent.info);
+        }
     }
 
     private void register() {
@@ -72,7 +79,7 @@ public class Peer implements Node {
         try {
             serverSocket = new ServerSocket(0);
             myConnInfo = new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort());
-            peerInfo = new PeerInfo(hexID, myConnInfo, hexID);
+            peerInfo = new PeerInfo(hexID, myConnInfo);
             log = Logger.getLogger(Peer.class.getName() + "[" + myConnInfo.toString() + "]");
             register();
             while(running) {

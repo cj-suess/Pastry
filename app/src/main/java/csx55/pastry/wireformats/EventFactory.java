@@ -15,12 +15,18 @@ public class EventFactory {
     }
 
     public Event createEvent() {
-        try(ByteArrayInputStream bais = new ByteArrayInputStream(data); DataInputStream dis = new DataInputStream(bais)) {
+        try(ByteArrayInputStream bais = new ByteArrayInputStream(data); 
+            DataInputStream dis = new DataInputStream(bais)) {
 
             int messageType = dis.readInt();
 
             switch (messageType) {
+                case Protocol.REGISTER_REQUEST:
+                    return readRegisterRequest(messageType, dis);
+                case Protocol.REGISTER_RESPONSE:
+                    return readStatusMessage(messageType, dis);
                 default:
+                    log.warning("Unknown message type received in the event factory...");
                     break;
             }
 
@@ -28,6 +34,34 @@ public class EventFactory {
             log.warning("Exception while creating event..." + e.getMessage());
         }
         return null;
+    }
+
+    private Register readRegisterRequest(int messageType, DataInputStream dis) {
+        try {
+            String hexID = readString(dis);
+            String ip = readString(dis);
+            int port = dis.readInt();
+            PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
+            Register register_request = new Register(messageType, peerInfo);
+            return register_request;
+        } catch(IOException e) {
+            log.warning("Exception while decoding register request...." + e.getMessage());
+        }
+        log.warning("Returning null instead of Register_Request object...");
+        return null;
+    }
+
+    private String readString(DataInputStream dis) throws IOException {
+        int length = dis.readInt();
+        byte[] bytes = new byte[length];
+        dis.readFully(bytes);
+        return new String(bytes);
+    }
+
+    private Message readStatusMessage(int messageType, DataInputStream dis) throws IOException {
+        byte statusCode = dis.readByte();
+        String info = readString(dis);
+        return new Message(messageType, statusCode, info);
     }
     
 }
