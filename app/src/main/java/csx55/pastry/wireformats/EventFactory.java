@@ -15,16 +15,18 @@ public class EventFactory {
     }
 
     public Event createEvent() {
-        try(ByteArrayInputStream bais = new ByteArrayInputStream(data); DataInputStream dis = new DataInputStream(bais)) {
+        try(ByteArrayInputStream bais = new ByteArrayInputStream(data); 
+            DataInputStream dis = new DataInputStream(bais)) {
 
             int messageType = dis.readInt();
 
             switch (messageType) {
                 case Protocol.REGISTER_REQUEST:
-                    readRegisterRequest(messageType, dis);
+                    return readRegisterRequest(messageType, dis);
                 case Protocol.REGISTER_RESPONSE:
-                    readStatusMessage(messageType, dis);
+                    return readStatusMessage(messageType, dis);
                 default:
+                    log.warning("Unknown message type received in the event factory...");
                     break;
             }
 
@@ -34,7 +36,7 @@ public class EventFactory {
         return null;
     }
 
-    private static Register readRegisterRequest(int messageType, DataInputStream dis) {
+    private Register readRegisterRequest(int messageType, DataInputStream dis) {
         try {
             String hexID = readString(dis);
             String ip = readString(dis);
@@ -49,14 +51,14 @@ public class EventFactory {
         return null;
     }
 
-    private static String readString(DataInputStream dis) throws IOException {
+    private String readString(DataInputStream dis) throws IOException {
         int length = dis.readInt();
         byte[] bytes = new byte[length];
         dis.readFully(bytes);
         return new String(bytes);
     }
 
-    private static Message readStatusMessage(int messageType, DataInputStream dis) throws IOException {
+    private Message readStatusMessage(int messageType, DataInputStream dis) throws IOException {
         byte statusCode = dis.readByte();
         String info = readString(dis);
         return new Message(messageType, statusCode, info);

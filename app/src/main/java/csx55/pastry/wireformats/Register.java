@@ -15,7 +15,7 @@ public class Register extends Event {
 
     @Override
     public int getType() {
-        return Protocol.REGISTER_REQUEST;
+        return messageType;
     }
 
     @Override

@@ -10,16 +10,15 @@ public abstract class Event {
     abstract void marshalData(DataOutputStream dout) throws IOException;
 
     public byte[] getBytes() throws IOException {
-        byte[] encodedData = null;
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dout = new DataOutputStream(baos);
-        dout.writeInt(this.getType());
-        marshalData(dout);
-        dout.flush();
-        encodedData = baos.toByteArray();
-        baos.close();
-        dout.close();
-        return encodedData;
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
+             DataOutputStream dout = new DataOutputStream(baos)) {
+             byte[] encodedData = null;
+             dout.writeInt(getType());
+             marshalData(dout);
+             dout.flush();
+             encodedData = baos.toByteArray();
+             return encodedData;
+        }
     }
 
     void writeString(DataOutputStream dout, String ip) throws IOException {

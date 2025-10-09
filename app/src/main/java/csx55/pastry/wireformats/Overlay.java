@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class Overlay implements Event {
+public class Overlay extends Event {
     
     public int messageType;
     public int numNodes;
@@ -59,6 +59,12 @@ public class Overlay implements Event {
                 dout.writeInt(node.getPort());
             }
         }
+    }
+
+    @Override
+    void marshalData(DataOutputStream dout) throws IOException {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'marshalData'");
     }
 }
 
