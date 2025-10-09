@@ -20,7 +20,7 @@ public class Discover implements Node {
     private boolean running = true;
 
     private List<TCPConnection> openConnections = new ArrayList<>();
-    private Map<PeerInfo, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
+    private Map<String, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
 
     public Discover(int port) {
         this.port = port;
@@ -29,14 +29,30 @@ public class Discover implements Node {
     @Override
     public void onEvent(Event event, Socket socket) {
         TCPSender sender = getSender(openConnections, socket);
-        if(event.getType() == Protocol.REGISTER_REQUEST) {
+        TCPConnection conn = getConnectionBySocket(openConnections, socket);
+        if(event == null) {
+            log.warning("Null event received from Event Factory...");
+        }
+        else if(event.getType() == Protocol.REGISTER_REQUEST) {
             log.info("Register request detected. Checking status...");
             Register registerEvent = (Register) event;
-            if (!peerToConnMap.containsKey(registerEvent.peerInfo)) {
-                sendRegisterSuccess(registerEvent, sender, socket);
+            if (!peerToConnMap.containsKey(registerEvent.peerInfo.getHexID())) {
+                peerToConnMap.put(registerEvent.peerInfo.getHexID(), conn);
+                sendSuccess(registerEvent, sender);
             }
             else {
-                sendRegisterFailure(registerEvent, sender);
+                sendFailure(registerEvent, sender);
+            }
+        }
+        else if(event.getType() == Protocol.DEREGISTER_REQUEST){
+            log.info("Deregister request detected. Checking status...");
+            Deregister deregisterEvent = (Deregister) event;
+            if (peerToConnMap.containsKey(deregisterEvent.peerInfo.getHexID())) {
+                peerToConnMap.remove(deregisterEvent.peerInfo.getHexID());
+                sendSuccess(deregisterEvent, sender);
+            }
+            else {
+                sendFailure(deregisterEvent, sender);
             }
         }
 
@@ -83,26 +99,39 @@ public class Discover implements Node {
         return sender;
     }
 
-    private void sendRegisterSuccess(Register registerEvent, TCPSender sender, Socket socket) {
+    private void sendSuccess(Event event, TCPSender sender) {
         try {
-            TCPConnection conn = getConnectionBySocket(openConnections, socket);
-            peerToConnMap.put(registerEvent.peerInfo, conn);
-            log.info(() -> "New node was added to the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
-            String info = "Registration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
-            Message successMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)0, info);
-            log.info(() -> "Sending success response to messaging node at " + registerEvent.peerInfo.conn.toString());
-            sender.sendData(successMessage.getBytes());
+            if(event.getType() == Protocol.REGISTER_REQUEST) {
+                Register registerEvent = (Register) event;
+                log.info(() -> registerEvent.peerInfo.getHexID() + " was added to the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
+                String info = "Registration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
+                Message successMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)0, info);
+                sender.sendData(successMessage.getBytes());
+            }
+            else if(event.getType() == Protocol.DEREGISTER_REQUEST){
+                Deregister deregisterEvent = (Deregister) event;
+                log.info(() -> deregisterEvent.peerInfo.getHexID() + " was removed from the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
+                String info = "Deregistration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
+                Message successMessage = new Message(Protocol.DEREGISTER_RESPONSE, (byte)0, info);
+                sender.sendData(successMessage.getBytes());
+            }
         } catch(IOException e) {
             log.warning("Exception while registering compute node..." + e.getStackTrace());
         }
     }
 
-    private void sendRegisterFailure(Register registerEvent, TCPSender sender) {
+    private void sendFailure(Event event, TCPSender sender) {
         try {
-            if(peerToConnMap.containsKey(registerEvent.peerInfo)) {
-                log.info(() -> "Cannot register node. A matching nodeID already exists in the registry...");
+            if(event.getType() == Protocol.REGISTER_REQUEST) {
+                log.info(() -> "Cannot register node. A matching node already exists in the registry...");
                 String info = "Registration request failed.";
                 Message failureMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)1, info);
+                sender.sendData(failureMessage.getBytes());
+            }
+            else if(event.getType() == Protocol.DEREGISTER_REQUEST) {
+                log.info(() -> "Cannot deregister node. The node does not exist in the registry...");
+                String info = "Deregistration request failed.";
+                Message failureMessage = new Message(Protocol.DEREGISTER_RESPONSE, (byte)1, info);
                 sender.sendData(failureMessage.getBytes());
             }
         } catch(IOException e) {

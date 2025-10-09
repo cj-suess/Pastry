@@ -6,11 +6,11 @@ import java.io.IOException;
 public class Deregister extends Event {
 
     public int messageType;
-    public ConnInfo connInfo;
+    public PeerInfo peerInfo;
 
-    public Deregister(int messageType, ConnInfo connInfo) {
+    public Deregister(int messageType, PeerInfo peerInfo) {
         this.messageType = messageType;
-        this.connInfo = connInfo;
+        this.peerInfo = peerInfo;
     }
 
     @Override
@@ -20,8 +20,9 @@ public class Deregister extends Event {
 
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
-        writeString(dout, connInfo.getIP());
-        dout.writeInt(connInfo.getPort());
+        writeString(dout, peerInfo.getHexID());
+        writeString(dout, peerInfo.getIP());
+        dout.writeInt(peerInfo.getPort());
     }
     
 }

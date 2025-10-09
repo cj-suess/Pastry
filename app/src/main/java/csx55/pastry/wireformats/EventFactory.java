@@ -22,8 +22,10 @@ public class EventFactory {
 
             switch (messageType) {
                 case Protocol.REGISTER_REQUEST:
+                case Protocol.DEREGISTER_REQUEST:
                     return readRegisterRequest(messageType, dis);
                 case Protocol.REGISTER_RESPONSE:
+                case Protocol.DEREGISTER_RESPONSE:
                     return readStatusMessage(messageType, dis);
                 default:
                     log.warning("Unknown message type received in the event factory...");
@@ -36,18 +38,18 @@ public class EventFactory {
         return null;
     }
 
-    private Register readRegisterRequest(int messageType, DataInputStream dis) {
+    private Event readRegisterRequest(int messageType, DataInputStream dis) {
         try {
             String hexID = readString(dis);
             String ip = readString(dis);
             int port = dis.readInt();
             PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
-            Register register_request = new Register(messageType, peerInfo);
-            return register_request;
+            Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
+            return request;
         } catch(IOException e) {
-            log.warning("Exception while decoding register request...." + e.getMessage());
+            log.warning("Exception while decoding request...." + e.getMessage());
         }
-        log.warning("Returning null instead of Register_Request object...");
+        log.warning("Returning null instead of request object...");
         return null;
     }
 
