@@ -50,6 +50,11 @@ public class Peer implements Node {
             Message responseEvent = (Message) event; 
             System.out.println(responseEvent.info);
         }
+        else if(event.getType() == Protocol.DEREGISTER_RESPONSE) {
+            log.info("Received deregister response from Registry...");
+            Message responseEvent = (Message) event;
+            System.out.println(responseEvent.info);
+        }
     }
 
     private void register() {
@@ -67,7 +72,7 @@ public class Peer implements Node {
 
     private void deregister() {
         log.info("Deregistering node...");
-            Deregister deregisterRequest = new Deregister(Protocol.DEREGISTER_REQUEST, myConnInfo);
+            Deregister deregisterRequest = new Deregister(Protocol.DEREGISTER_REQUEST, peerInfo);
             try {
                 regConn.sender.sendData(deregisterRequest.getBytes());
             } catch (IOException e) {
@@ -101,6 +106,7 @@ public class Peer implements Node {
                 switch (command) {
                     case "exit":
                         deregister();
+                        break;
                     default:
                         break;
                 }
