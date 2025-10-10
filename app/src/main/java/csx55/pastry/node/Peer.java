@@ -60,18 +60,25 @@ public class Peer implements Node {
     private void startsEvents() {
         events = Map.of(
             Protocol.REGISTER_RESPONSE, this::registerResponse,
-            Protocol.DEREGISTER_RESPONSE, this::deregisterResponse
+            Protocol.DEREGISTER_RESPONSE, this::deregisterResponse,
+            Protocol.ENTRY_NODE, this::processEntryNode
         );
     }
 
+    private void processEntryNode(Event event){
+        log.info(() -> "Received entry node from Discovery...");
+        EntryNode entryNode = (EntryNode) event;
+        log.info(() -> entryNode.peerInfo.toString());
+    }
+
     private void registerResponse(Event event) {
-        log.info(() -> "Received register response from Registry...");
+        log.info(() -> "Received register response from Discovery...");
         Message responseEvent = (Message) event; 
         log.info(() -> responseEvent.info);
     }
 
     private void deregisterResponse(Event event) {
-        log.info(() -> "Received deregister response from Registry...");
+        log.info(() -> "Received deregister response from Discovery...");
         Message responseEvent = (Message) event;
         log.info(() -> responseEvent.info);
     }

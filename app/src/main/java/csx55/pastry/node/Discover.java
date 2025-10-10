@@ -21,6 +21,7 @@ public class Discover implements Node {
     private int port;
     private ServerSocket serverSocket;
     private boolean running = true;
+    private Random rand = new Random();
 
     private Map<PeerInfo, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
@@ -57,12 +58,32 @@ public class Discover implements Node {
         TCPSender sender = conn.getSender();
         Register registerEvent = (Register) event;
         if (!peerToConnMap.containsKey(registerEvent.peerInfo)) {
+            if(peerToConnMap.size() > 0) {
+                log.info(() -> "Sending entry node to " + registerEvent.peerInfo.getHexID());
+                sendEntryNode(sender);
+            }
             peerToConnMap.put(registerEvent.peerInfo, conn);
             sendSuccess(registerEvent, sender);
         }
         else {
             sendFailure(registerEvent, sender);
         }
+    }
+
+    private void sendEntryNode(TCPSender sender) {
+        try {
+            EntryNode entryNodeMessage = new EntryNode(Protocol.ENTRY_NODE, getRandomEntryNode());
+            log.info(() -> "Sending " + entryNodeMessage.peerInfo.getHexID());
+            sender.sendData(entryNodeMessage.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
+        }
+    }
+
+    private PeerInfo getRandomEntryNode() {
+        List<PeerInfo> list = new ArrayList<>(peerToConnMap.keySet());
+        PeerInfo peerInfo = list.get(rand.nextInt(list.size()));
+        return peerInfo;
     }
 
     private void deregisterRequest(Event event, Socket socket) {
