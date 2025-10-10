@@ -1,21 +1,26 @@
 package csx55.pastry.util;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.TreeSet;
 
-import csx55.pastry.wireformats.PeerInfo;
+import csx55.pastry.wireformats.*;
 
 public class Leafset {
     
-    List<PeerInfo> neighbors = Collections.synchronizedList(new ArrayList<>());
+    private TreeSet<PeerInfo> neighbors = new TreeSet<>();
 
-    public Leafset() {
-
-    }
-
-    public List<PeerInfo> getLeafSet(){
-        return neighbors;
+    public void addPeer(PeerInfo peerInfo) {
+        neighbors.add(peerInfo);
     }
     
+    public PeerInfo getlower(PeerInfo peerInfo) {
+        return neighbors.lower(peerInfo);
+    }
+
+    public PeerInfo getHigher(PeerInfo peerInfo) {
+        return neighbors.higher(peerInfo);
+    }
+
+    public TreeSet<PeerInfo> getLeafSet() {
+        return neighbors;
+    }
 }
