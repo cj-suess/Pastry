@@ -83,8 +83,7 @@ public class Discover implements Node {
         try(Scanner scanner = new Scanner(System.in)) {
             while(running) {
                 String command = scanner.nextLine();
-                String[] splitCommand = command.split("\\s+");
-                commands.get(splitCommand[0]).run();
+                commands.get(command).run();
             }
         }
     }
