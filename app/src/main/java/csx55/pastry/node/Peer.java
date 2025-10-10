@@ -43,17 +43,17 @@ public class Peer implements Node {
     @Override
     public void onEvent(Event event, Socket socket) {
         if(event == null) {
-            log.warning("Null event received from Event Factory...");
+            log.warning(() -> "Null event received from Event Factory...");
         }
         else if(event.getType() == Protocol.REGISTER_RESPONSE) {
-            log.info("Received register response from Registry...");
+            log.info(() -> "Received register response from Registry...");
             Message responseEvent = (Message) event; 
-            System.out.println(responseEvent.info);
+            log.info(() -> responseEvent.info);
         }
         else if(event.getType() == Protocol.DEREGISTER_RESPONSE) {
-            log.info("Received deregister response from Registry...");
+            log.info(() -> "Received deregister response from Registry...");
             Message responseEvent = (Message) event;
-            System.out.println(responseEvent.info);
+            log.info(() -> responseEvent.info);
         }
     }
 
@@ -71,7 +71,7 @@ public class Peer implements Node {
     }
 
     private void deregister() {
-        log.info("Deregistering node...");
+        log.info(() -> "Deregistering node...");
             Deregister deregisterRequest = new Deregister(Protocol.DEREGISTER_REQUEST, peerInfo);
             try {
                 regConn.sender.sendData(deregisterRequest.getBytes());
@@ -97,7 +97,7 @@ public class Peer implements Node {
             }));
             while(running) {
                 Socket clientSocket = serverSocket.accept();
-                log.info("New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
+                log.info(() -> "New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
                 TCPConnection conn = new TCPConnection(clientSocket, this);
                 conn.startReceiverThread();
                 socketToConn.put(clientSocket, conn);
@@ -116,14 +116,12 @@ public class Peer implements Node {
                         deregister();
                         break;
                     default:
-                        log.warning("Unknown terminal command...");
+                        log.warning(() -> "Unknown terminal command...");
                         break;
                 }
             }
         } 
     }
-
-    // exit method
 
     public static void main(String[] args) {
 
