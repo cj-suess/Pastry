@@ -7,24 +7,27 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.logging.*;
 
 public class Peer implements Node {
 
     private Logger log = Logger.getLogger(this.getClass().getName());
+    private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
     private boolean running = true;
-
-    private ServerSocket serverSocket;
-    
     private ConnInfo regNodeInfo;
     private TCPConnection regConn;
 
-    private ConnInfo myConnInfo;
     private String hexID;
     public PeerInfo peerInfo;
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+
+    private Map<Integer, Consumer<Event>> events = new HashMap<>();
+    private Map<String, Runnable> commands = new HashMap<>();
+
+
     // Leafset
     // Routing Table
     
@@ -32,29 +35,45 @@ public class Peer implements Node {
     public Peer(String host, int port, String hexID) {
         regNodeInfo = new ConnInfo(host, port);
         this.hexID = hexID;
+        startsEvents();
+        startCommands();
     }
 
     public Peer(String host, int port){
         regNodeInfo = new ConnInfo(host, port);
         this.hexID = String.format("%04X", ThreadLocalRandom.current().nextInt(65536));
+        startsEvents();
+        startCommands();
     }
 
 
     @Override
     public void onEvent(Event event, Socket socket) {
-        if(event == null) {
-            log.warning(() -> "Null event received from Event Factory...");
+        if(event != null) {
+            Consumer<Event> handler = events.get(event.getType());
+            handler.accept(event);
+        } else {
+            warning.accept(null);
         }
-        else if(event.getType() == Protocol.REGISTER_RESPONSE) {
-            log.info(() -> "Received register response from Registry...");
-            Message responseEvent = (Message) event; 
-            log.info(() -> responseEvent.info);
-        }
-        else if(event.getType() == Protocol.DEREGISTER_RESPONSE) {
-            log.info(() -> "Received deregister response from Registry...");
-            Message responseEvent = (Message) event;
-            log.info(() -> responseEvent.info);
-        }
+    }
+
+    private void startsEvents() {
+        events = Map.of(
+            Protocol.REGISTER_RESPONSE, this::registerResponse,
+            Protocol.DEREGISTER_RESPONSE, this::deregisterResponse
+        );
+    }
+
+    private void registerResponse(Event event) {
+        log.info(() -> "Received register response from Registry...");
+        Message responseEvent = (Message) event; 
+        log.info(() -> responseEvent.info);
+    }
+
+    private void deregisterResponse(Event event) {
+        log.info(() -> "Received deregister response from Registry...");
+        Message responseEvent = (Message) event;
+        log.info(() -> responseEvent.info);
     }
 
     private void register() {
@@ -65,7 +84,7 @@ public class Peer implements Node {
             regConn.startReceiverThread();
             regConn.sender.sendData(registerMessage.getBytes());
         } catch(IOException e) {
-            log.log(Level.WARNING, "Exception thrown while registering node with Registry..." , e);
+            warning.accept(e);
         }
 
     }
@@ -76,23 +95,22 @@ public class Peer implements Node {
             try {
                 regConn.sender.sendData(deregisterRequest.getBytes());
             } catch (IOException e) {
-                log.log(Level.WARNING, "Exception while deregitering node...", e);
+                warning.accept(e);
             }
     }
 
     private void startNode() {
         try {
-            serverSocket = new ServerSocket(0);
-            myConnInfo = new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort());
-            peerInfo = new PeerInfo(hexID, myConnInfo);
-            log = Logger.getLogger(Peer.class.getName() + "[" + myConnInfo.toString() + "]");
+            ServerSocket serverSocket = new ServerSocket(0);
+            peerInfo = new PeerInfo(hexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
+            log = Logger.getLogger(Peer.class.getName() + "[" + peerInfo.toString() + "]");
             register();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     deregister();
                     serverSocket.close();
                 } catch(IOException e) {
-                    log.log(Level.WARNING, "Exception during sudden termination...", e);
+                    warning.accept(e);
                 }
             }));
             while(running) {
@@ -103,7 +121,7 @@ public class Peer implements Node {
                 socketToConn.put(clientSocket, conn);
             }
         }catch(IOException e) {
-            log.log(Level.WARNING, "Exception in startNode....", e);
+            warning.accept(e);
         }
     }
 
@@ -111,16 +129,13 @@ public class Peer implements Node {
         try(Scanner scanner = new Scanner(System.in)) {
             while(true) {
                 String command = scanner.nextLine();
-                switch (command) {
-                    case "exit":
-                        deregister();
-                        break;
-                    default:
-                        log.warning(() -> "Unknown terminal command...");
-                        break;
-                }
+                commands.get(command).run();
             }
         } 
+    }
+
+    private void startCommands() {
+        commands.put("exit", this::deregister);
     }
 
     public static void main(String[] args) {

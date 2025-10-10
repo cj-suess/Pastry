@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.logging.*;
 
 import csx55.pastry.transport.TCPConnection;
@@ -14,48 +16,67 @@ import csx55.pastry.wireformats.*;
 public class Discover implements Node {
     
     private Logger log = Logger.getLogger(this.getClass().getName());
-    
+    private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);  
+
     private int port;
     private ServerSocket serverSocket;
     private boolean running = true;
 
-    private Map<String, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
+    private Map<PeerInfo, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+    
+    private Map<String, Runnable> commands = new HashMap<>();
+    private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
 
     public Discover(int port) {
         this.port = port;
+        startEvents();
+        startCommands();
     }
 
     @Override
     public void onEvent(Event event, Socket socket) {
+        if(event != null) {
+            BiConsumer<Event, Socket> handler = events.get(event.getType());
+            handler.accept(event, socket);
+        } else {
+             warning.accept(null);
+        }
+    }
+
+    private void startEvents() {
+        events = Map.of(
+            Protocol.REGISTER_REQUEST, this::registerRequest,
+            Protocol.DEREGISTER_REQUEST, this::deregisterRequest
+        );
+    }
+
+    private void registerRequest(Event event, Socket socket) {
+        log.info("Register request detected. Checking status...");
         TCPConnection conn = socketToConn.get(socket);
         TCPSender sender = conn.getSender();
-        if(event == null) {
-            log.warning("Null event received from Event Factory...");
+        Register registerEvent = (Register) event;
+        if (!peerToConnMap.containsKey(registerEvent.peerInfo)) {
+            peerToConnMap.put(registerEvent.peerInfo, conn);
+            sendSuccess(registerEvent, sender);
         }
-        else if(event.getType() == Protocol.REGISTER_REQUEST) {
-            log.info("Register request detected. Checking status...");
-            Register registerEvent = (Register) event;
-            if (!peerToConnMap.containsKey(registerEvent.peerInfo.getHexID())) {
-                peerToConnMap.put(registerEvent.peerInfo.getHexID(), conn);
-                sendSuccess(registerEvent, sender);
-            }
-            else {
-                sendFailure(registerEvent, sender);
-            }
+        else {
+            sendFailure(registerEvent, sender);
         }
-        else if(event.getType() == Protocol.DEREGISTER_REQUEST){
-            log.info("Deregister request detected. Checking status...");
-            Deregister deregisterEvent = (Deregister) event;
-            if (peerToConnMap.containsKey(deregisterEvent.peerInfo.getHexID())) {
-                peerToConnMap.remove(deregisterEvent.peerInfo.getHexID());
-                sendSuccess(deregisterEvent, sender);
-            }
-            else {
-                sendFailure(deregisterEvent, sender);
-            }
-        }
+    }
 
+    private void deregisterRequest(Event event, Socket socket) {
+        log.info("Deregister request detected. Checking status...");
+        TCPConnection conn = socketToConn.get(socket);
+        TCPSender sender = conn.getSender();
+        Deregister deregisterEvent = (Deregister) event;
+        if (peerToConnMap.containsKey(deregisterEvent.peerInfo)) {
+            peerToConnMap.remove(deregisterEvent.peerInfo);
+            sendSuccess(deregisterEvent, sender);
+        }
+        else {
+            sendFailure(deregisterEvent, sender);
+        }
     }
 
     public void readTerminal() {
@@ -63,13 +84,19 @@ public class Discover implements Node {
             while(running) {
                 String command = scanner.nextLine();
                 String[] splitCommand = command.split("\\s+");
-                switch (splitCommand[0]) {
-                    default:
-                        log.warning("Unknown terminal command...");
-                        break;
-                }
+                commands.get(splitCommand[0]).run();
             }
         }
+    }
+
+    private void startCommands() {
+        commands.put("list-nodes", this::listNodes);
+    }
+
+    private void listNodes() {
+        peerToConnMap.keySet().forEach(key -> {
+            System.out.println(key.toString());
+        });
     }
 
     private void startDiscovery() {
