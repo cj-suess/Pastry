@@ -33,7 +33,7 @@ public class EventFactory {
             }
 
         } catch(IOException e) {
-            log.warning("Exception while creating event..." + e.getMessage());
+            log.log(Level.WARNING, "Exception while creating event...", e);
         }
         return null;
     }
@@ -47,9 +47,9 @@ public class EventFactory {
             Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
             return request;
         } catch(IOException e) {
-            log.warning("Exception while decoding request...." + e.getMessage());
+            log.log(Level.WARNING, "Exception while decoding request....", e);
         }
-        log.warning("Returning null instead of request object...");
+        log.log(Level.WARNING, "Returning null instead of request object...");
         return null;
     }
 
@@ -61,9 +61,8 @@ public class EventFactory {
     }
 
     private Message readStatusMessage(int messageType, DataInputStream dis) throws IOException {
-        byte statusCode = dis.readByte();
         String info = readString(dis);
-        return new Message(messageType, statusCode, info);
+        return new Message(messageType, info);
     }
     
 }

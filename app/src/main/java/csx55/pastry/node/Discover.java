@@ -19,8 +19,8 @@ public class Discover implements Node {
     private ServerSocket serverSocket;
     private boolean running = true;
 
-    private List<TCPConnection> openConnections = new ArrayList<>();
     private Map<String, TCPConnection> peerToConnMap = new ConcurrentHashMap<>();
+    private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
 
     public Discover(int port) {
         this.port = port;
@@ -28,8 +28,8 @@ public class Discover implements Node {
 
     @Override
     public void onEvent(Event event, Socket socket) {
-        TCPSender sender = getSender(openConnections, socket);
-        TCPConnection conn = getConnectionBySocket(openConnections, socket);
+        TCPConnection conn = socketToConn.get(socket);
+        TCPSender sender = conn.getSender();
         if(event == null) {
             log.warning("Null event received from Event Factory...");
         }
@@ -82,21 +82,11 @@ public class Discover implements Node {
                 log.info("New connection from: " + client.getAddress() + ":" + client.getPort());
                 TCPConnection conn = new TCPConnection(clientSocket, this);
                 conn.startReceiverThread();
-                openConnections.add(conn);
+                socketToConn.put(clientSocket, conn);
             }
         } catch(IOException e) {
-            log.warning("Exception while accepting connections..." + e.getStackTrace());
+            log.log(Level.WARNING, "Exception while starting discovery node...", e);
         }
-    }
-
-    private TCPSender getSender(List<TCPConnection> openConnections, Socket socket) {
-        TCPSender sender = null;
-        for(TCPConnection conn : openConnections) {
-            if(socket == conn.socket) {
-                sender = conn.sender;
-            }
-        }
-        return sender;
     }
 
     private void sendSuccess(Event event, TCPSender sender) {
@@ -105,18 +95,18 @@ public class Discover implements Node {
                 Register registerEvent = (Register) event;
                 log.info(() -> registerEvent.peerInfo.getHexID() + " was added to the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
                 String info = "Registration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
-                Message successMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)0, info);
+                Message successMessage = new Message(Protocol.REGISTER_RESPONSE, info);
                 sender.sendData(successMessage.getBytes());
             }
             else if(event.getType() == Protocol.DEREGISTER_REQUEST){
                 Deregister deregisterEvent = (Deregister) event;
                 log.info(() -> deregisterEvent.peerInfo.getHexID() + " was removed from the registry successfully!\n" + "\tCurrent number of nodes in registry: " + peerToConnMap.size());
                 String info = "Deregistration request successful. The number of messaging nodes currently constituting the overlay is (" + peerToConnMap.size() + ")";
-                Message successMessage = new Message(Protocol.DEREGISTER_RESPONSE, (byte)0, info);
+                Message successMessage = new Message(Protocol.DEREGISTER_RESPONSE, info);
                 sender.sendData(successMessage.getBytes());
             }
         } catch(IOException e) {
-            log.warning("Exception while registering compute node..." + e.getStackTrace());
+            log.log(Level.WARNING, "Exception while registering compute node...", e);
         }
     }
 
@@ -125,27 +115,18 @@ public class Discover implements Node {
             if(event.getType() == Protocol.REGISTER_REQUEST) {
                 log.info(() -> "Cannot register node. A matching node already exists in the registry...");
                 String info = "Registration request failed.";
-                Message failureMessage = new Message(Protocol.REGISTER_RESPONSE, (byte)1, info);
+                Message failureMessage = new Message(Protocol.REGISTER_RESPONSE, info);
                 sender.sendData(failureMessage.getBytes());
             }
             else if(event.getType() == Protocol.DEREGISTER_REQUEST) {
                 log.info(() -> "Cannot deregister node. The node does not exist in the registry...");
                 String info = "Deregistration request failed.";
-                Message failureMessage = new Message(Protocol.DEREGISTER_RESPONSE, (byte)1, info);
+                Message failureMessage = new Message(Protocol.DEREGISTER_RESPONSE, info);
                 sender.sendData(failureMessage.getBytes());
             }
         } catch(IOException e) {
-            log.warning("Exception while registering compute node..." + e.getStackTrace());
+            log.log(Level.WARNING, "Exception while registering compute node...", e);
         }
-    }
-
-    private TCPConnection getConnectionBySocket(List<TCPConnection> openConnections, Socket socket) {
-        for(TCPConnection conn : openConnections) {
-            if(conn.socket == socket) {
-                return conn;
-            }
-        }
-        return null;
     }
 
     // store registered nodes (16-bit identifier, NodeID, nickname)

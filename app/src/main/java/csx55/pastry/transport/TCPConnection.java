@@ -22,5 +22,9 @@ public class TCPConnection {
         new Thread(receiver).start();
     }
 
+    public TCPSender getSender() {
+        return sender;
+    }
+
 }
 

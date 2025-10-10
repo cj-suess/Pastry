@@ -65,7 +65,7 @@ public class Peer implements Node {
             regConn.startReceiverThread();
             regConn.sender.sendData(registerMessage.getBytes());
         } catch(IOException e) {
-            log.warning("Exception thrown while registering node with Registry..." + e.getStackTrace().toString());
+            log.log(Level.WARNING, "Exception thrown while registering node with Registry..." , e);
         }
 
     }
@@ -76,7 +76,7 @@ public class Peer implements Node {
             try {
                 regConn.sender.sendData(deregisterRequest.getBytes());
             } catch (IOException e) {
-                log.warning("Exception while deregitering node..." + e.getMessage());
+                log.log(Level.WARNING, "Exception while deregitering node...", e);
             }
     }
 
@@ -87,6 +87,14 @@ public class Peer implements Node {
             peerInfo = new PeerInfo(hexID, myConnInfo);
             log = Logger.getLogger(Peer.class.getName() + "[" + myConnInfo.toString() + "]");
             register();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    deregister();
+                    serverSocket.close();
+                } catch(IOException e) {
+                    log.log(Level.WARNING, "Exception during sudden termination...", e);
+                }
+            }));
             while(running) {
                 Socket clientSocket = serverSocket.accept();
                 log.info("New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
@@ -95,7 +103,7 @@ public class Peer implements Node {
                 socketToConn.put(clientSocket, conn);
             }
         }catch(IOException e) {
-            log.warning("Exception in startNode...." + e.getStackTrace());
+            log.log(Level.WARNING, "Exception in startNode....", e);
         }
     }
 
@@ -108,6 +116,7 @@ public class Peer implements Node {
                         deregister();
                         break;
                     default:
+                        log.warning("Unknown terminal command...");
                         break;
                 }
             }
