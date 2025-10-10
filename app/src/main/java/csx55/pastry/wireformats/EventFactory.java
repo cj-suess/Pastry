@@ -3,11 +3,13 @@ package csx55.pastry.wireformats;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.function.Consumer;
 import java.util.logging.*;
 
 public class EventFactory {
 
     private final static Logger log = Logger.getLogger(EventFactory.class.getName());
+    private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
     private final byte[] data;
 
     public EventFactory(byte[] data) {
@@ -28,12 +30,12 @@ public class EventFactory {
                 case Protocol.DEREGISTER_RESPONSE:
                     return readStatusMessage(messageType, dis);
                 default:
-                    log.warning("Unknown message type received in the event factory...");
+                    warning.accept(null);
                     break;
             }
 
         } catch(IOException e) {
-            log.log(Level.WARNING, "Exception while creating event...", e);
+            warning.accept(e);
         }
         return null;
     }
@@ -47,9 +49,9 @@ public class EventFactory {
             Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
             return request;
         } catch(IOException e) {
-            log.log(Level.WARNING, "Exception while decoding request....", e);
+            warning.accept(e);
         }
-        log.log(Level.WARNING, "Returning null instead of request object...");
+        warning.accept(null);
         return null;
     }
 
