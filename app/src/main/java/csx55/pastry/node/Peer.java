@@ -67,7 +67,6 @@ public class Peer implements Node {
         JoinRequest joinRequest = (JoinRequest) event;
         log.info(() -> "Received join request from " + joinRequest.peerInfo.toString());
         String destinationHex = joinRequest.getDestinationHex();
-        // compare hexIDs
         if(joinRequest.peerInfo.getHexID().compareTo(joinRequest.getDestinationHex()) == 0){ // see if I am the destination
             // send back that we are the closest
             // send leafset and routing table
@@ -78,8 +77,6 @@ public class Peer implements Node {
             // I have a peer at that position
         }
     }
-
-    // compare hexIDs method
 
     private void processEntryNode(Event event){
         EntryNode entryNode = (EntryNode) event;
