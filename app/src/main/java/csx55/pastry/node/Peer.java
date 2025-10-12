@@ -68,7 +68,7 @@ public class Peer implements Node {
         log.info(() -> "Received join request from " + joinRequest.peerInfo.toString());
         String destinationHex = joinRequest.getDestinationHex();
         if(joinRequest.peerInfo.getHexID().compareTo(joinRequest.getDestinationHex()) == 0){ // see if I am the destination
-            // send back that we are the closest
+            // send back that we are the closest -> not sure about this part
             // send leafset and routing table
         } else if(ls.checkDestinationHex(destinationHex)) { // see if the destination is my leafset
             // destination is in my leafset
