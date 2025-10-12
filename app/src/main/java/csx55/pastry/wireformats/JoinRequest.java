@@ -25,6 +25,7 @@ public class JoinRequest extends Event {
         writeString(dout, peerInfo.getHexID());
         writeString(dout, peerInfo.getIP());
         dout.writeInt(peerInfo.getPort());
+        writeString(dout, destinationHex);
     }
 
 }
