@@ -7,12 +7,10 @@ public class JoinRequest extends Event {
     
     public int messageType;
     public PeerInfo peerInfo;
-    private String destinationHex;
 
-    public JoinRequest(int messageType, PeerInfo peerInfo, String myHexID) {
+    public JoinRequest(int messageType, PeerInfo joiningNodeInfo) {
         this.messageType = messageType;
-        this.peerInfo = peerInfo;
-        this.destinationHex = myHexID;
+        this.peerInfo = joiningNodeInfo;
     }
 
     @Override
@@ -25,20 +23,5 @@ public class JoinRequest extends Event {
         writeString(dout, peerInfo.getHexID());
         writeString(dout, peerInfo.getIP());
         dout.writeInt(peerInfo.getPort());
-        writeString(dout, destinationHex);
     }
-
-    // longest matching prefix length
-    public int longestMatchingPrefixLength(String id1, String id2) {
-        for(int i = 0; i < id1.length(); i++) {
-            if(id1.charAt(i) != id2.charAt(i)){ return i; }
-        }
-        return id1.length();
-    }
-
-    public String getDestinationHex() {
-        return destinationHex;
-    }
-
-
 }

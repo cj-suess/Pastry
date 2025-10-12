@@ -50,8 +50,7 @@ public class EventFactory {
             String ip = readString(dis);
             int port = dis.readInt();
             PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
-            String destinationHex = readString(dis);
-            return new JoinRequest(messageType, peerInfo, destinationHex);
+            return new JoinRequest(messageType, peerInfo);
         } catch(IOException e) {
             warning.accept(e);
         }
