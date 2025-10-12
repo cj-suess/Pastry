@@ -31,6 +31,8 @@ public class EventFactory {
                     return readStatusMessage(messageType, dis);
                 case Protocol.ENTRY_NODE:
                     return readEntryNode(messageType, dis);
+                case Protocol.JOIN_REQUEST:
+                    return readJoinRequest(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -39,6 +41,21 @@ public class EventFactory {
         } catch(IOException e) {
             warning.accept(e);
         }
+        return null;
+    }
+
+    private JoinRequest readJoinRequest(int messageType, DataInputStream dis){
+        try {
+            String hexID = readString(dis);
+            String ip = readString(dis);
+            int port = dis.readInt();
+            PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
+            String destinationHex = readString(dis);
+            return new JoinRequest(messageType, peerInfo, destinationHex);
+        } catch(IOException e) {
+            warning.accept(e);
+        }
+        warning.accept(null);
         return null;
     }
 

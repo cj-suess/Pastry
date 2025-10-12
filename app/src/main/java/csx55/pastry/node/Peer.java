@@ -1,7 +1,7 @@
 package csx55.pastry.node;
 
 import csx55.pastry.transport.TCPConnection;
-import csx55.pastry.util.LogConfig;
+import csx55.pastry.util.*;
 import csx55.pastry.wireformats.*;
 import java.io.*;
 import java.net.*;
@@ -19,29 +19,30 @@ public class Peer implements Node {
     private ConnInfo regNodeInfo;
     private TCPConnection regConn;
 
-    private String hexID;
-    public PeerInfo peerInfo;
+    private String myHexID;
+    public PeerInfo myPeerInfo;
+    Leafset ls;
+    RoutingTable rt;
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
 
     private Map<Integer, Consumer<Event>> events = new HashMap<>();
     private Map<String, Runnable> commands = new HashMap<>();
 
-
-    // Leafset
-    // Routing Table
-    
-
     public Peer(String host, int port, String hexID) {
         regNodeInfo = new ConnInfo(host, port);
-        this.hexID = hexID;
+        this.myHexID = hexID;
+        this.ls = new Leafset();
+        this.rt = new RoutingTable();
         startsEvents();
         startCommands();
     }
 
     public Peer(String host, int port){
         regNodeInfo = new ConnInfo(host, port);
-        this.hexID = String.format("%04X", ThreadLocalRandom.current().nextInt(65536));
+        this.myHexID = String.format("%04X", ThreadLocalRandom.current().nextInt(65536));
+        this.ls = new Leafset();
+        this.rt = new RoutingTable();
         startsEvents();
         startCommands();
     }
@@ -61,14 +62,38 @@ public class Peer implements Node {
         events = Map.of(
             Protocol.REGISTER_RESPONSE, this::registerResponse,
             Protocol.DEREGISTER_RESPONSE, this::deregisterResponse,
-            Protocol.ENTRY_NODE, this::processEntryNode
+            Protocol.ENTRY_NODE, this::processEntryNode,
+            Protocol.JOIN_REQUEST, this::processJoinRequest
         );
     }
 
+    private void processJoinRequest(Event event) {
+        JoinRequest joinRequest = (JoinRequest) event;
+        log.info(() -> "Received join request from " + joinRequest.peerInfo.toString());
+        // compare hexIDs
+            // see if I am the destination
+            // see if the destination is my leafset
+            // check routing table 
+    }
+
     private void processEntryNode(Event event){
-        log.info(() -> "Received entry node from Discovery...");
         EntryNode entryNode = (EntryNode) event;
-        log.info(() -> entryNode.peerInfo.toString());
+        log.info(() -> "Received entry node from Discovery: " + entryNode.peerInfo.toString());
+        log.info(() -> "Sending join request...");
+        sendJoinRequest(entryNode.peerInfo.getIP(), entryNode.peerInfo.getPort());
+    }
+
+    private void sendJoinRequest(String host, int port) {
+        try {
+            JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo, myHexID);
+            Socket socket = new Socket(host, port);
+            TCPConnection conn = new TCPConnection(socket, this);
+            socketToConn.put(socket, conn);
+            conn.startReceiverThread();
+            conn.sender.sendData(joinRequest.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
+        }
     }
 
     private void registerResponse(Event event) {
@@ -87,18 +112,17 @@ public class Peer implements Node {
         try{
             Socket socket = new Socket(regNodeInfo.getIP(), regNodeInfo.getPort());
             regConn = new TCPConnection(socket, this);
-            Register registerMessage = new Register(Protocol.REGISTER_REQUEST, peerInfo);
+            Register registerMessage = new Register(Protocol.REGISTER_REQUEST, myPeerInfo);
             regConn.startReceiverThread();
             regConn.sender.sendData(registerMessage.getBytes());
         } catch(IOException e) {
             warning.accept(e);
         }
-
     }
 
     private void deregister() {
         log.info(() -> "Deregistering node...");
-            Deregister deregisterRequest = new Deregister(Protocol.DEREGISTER_REQUEST, peerInfo);
+            Deregister deregisterRequest = new Deregister(Protocol.DEREGISTER_REQUEST, myPeerInfo);
             try {
                 regConn.sender.sendData(deregisterRequest.getBytes());
             } catch (IOException e) {
@@ -109,8 +133,8 @@ public class Peer implements Node {
     private void startNode() {
         try {
             ServerSocket serverSocket = new ServerSocket(0);
-            peerInfo = new PeerInfo(hexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
-            log = Logger.getLogger(Peer.class.getName() + "[" + peerInfo.toString() + "]");
+            myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
+            log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
@@ -154,5 +178,4 @@ public class Peer implements Node {
         new Thread(peer::readTerminal, "Node-" + peer.toString() + "-Terminal").start();
 
     }
-
 }

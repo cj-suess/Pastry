@@ -6,4 +6,5 @@ public interface Protocol {
     int DEREGISTER_REQUEST = 3;
     int DEREGISTER_RESPONSE = 4;
     int ENTRY_NODE = 5;
+    int JOIN_REQUEST = 6;
 }
