@@ -21,8 +21,8 @@ public class Peer implements Node {
 
     private String myHexID;
     public PeerInfo myPeerInfo;
-    Leafset ls;
-    RoutingTable rt;
+    Leafset ls = new Leafset();
+    RoutingTable rt = new RoutingTable();
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
 
@@ -32,8 +32,6 @@ public class Peer implements Node {
     public Peer(String host, int port, String hexID) {
         regNodeInfo = new ConnInfo(host, port);
         this.myHexID = hexID;
-        this.ls = new Leafset();
-        this.rt = new RoutingTable();
         startsEvents();
         startCommands();
     }
@@ -41,8 +39,6 @@ public class Peer implements Node {
     public Peer(String host, int port){
         regNodeInfo = new ConnInfo(host, port);
         this.myHexID = String.format("%04X", ThreadLocalRandom.current().nextInt(65536));
-        this.ls = new Leafset();
-        this.rt = new RoutingTable();
         startsEvents();
         startCommands();
     }
@@ -70,10 +66,16 @@ public class Peer implements Node {
     private void processJoinRequest(Event event) {
         JoinRequest joinRequest = (JoinRequest) event;
         log.info(() -> "Received join request from " + joinRequest.peerInfo.toString());
-        // compare hexIDs
-            // see if I am the destination
-            // see if the destination is my leafset
-            // check routing table 
+        String destinationHex = joinRequest.getDestinationHex();
+        if(joinRequest.peerInfo.getHexID().compareTo(joinRequest.getDestinationHex()) == 0){ // see if I am the destination
+            // send back that we are the closest
+            // send leafset and routing table
+        } else if(ls.checkDestinationHex(destinationHex)) { // see if the destination is my leafset
+            // destination is in my leafset
+            // forward join request
+        } else if(rt.checkRoutingTable(joinRequest.longestMatchingPrefixLength(joinRequest.peerInfo.getHexID(), destinationHex)) != null) { // check routing table 
+            // I have a peer at that position
+        }
     }
 
     private void processEntryNode(Event event){
