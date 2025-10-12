@@ -23,4 +23,13 @@ public class Leafset {
     public TreeSet<PeerInfo> getLeafSet() {
         return neighbors;
     }
+
+    public boolean checkDestinationHex(String destinationHex) {
+        for(PeerInfo p : neighbors){
+            if (p.getHexID().equals(destinationHex)){
+                return true;
+            }
+        }
+        return false;
+    }
 }

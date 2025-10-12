@@ -14,6 +14,15 @@ public class RoutingTable {
         return rt[row][col];
     }
 
+    public PeerInfo checkRoutingTable(int row){
+        for(int i = 0; i < rt.length; i++){
+            if(rt[row][i] != null) {
+                return rt[row][i];
+            }
+        }
+        return null;
+    }
+
     // print table method
 
 }
