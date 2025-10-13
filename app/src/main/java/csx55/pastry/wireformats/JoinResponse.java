@@ -9,12 +9,14 @@ import csx55.pastry.util.RoutingTable;
 
 public class JoinResponse extends Event {
 
-    int messageType;
-    Leafset ls;
-    RoutingTable rt;
+    private final int messageType;
+    private final PeerInfo peerInfo;
+    private final Leafset ls;
+    private final RoutingTable rt;
 
-    public JoinResponse(int messageType, Leafset ls, RoutingTable rt) {
+    public JoinResponse(int messageType, PeerInfo peerInfo, Leafset ls, RoutingTable rt) {
         this.messageType = messageType;
+        this.peerInfo = peerInfo;
         this.ls = ls;
         this.rt = rt;
     }
@@ -26,6 +28,7 @@ public class JoinResponse extends Event {
 
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
+        writePeerInfo(dout, peerInfo);
         List<PeerInfo> lsList = ls.getAllPeers();
         dout.writeInt(lsList.size());
         writeLeafset(dout, lsList);
@@ -58,5 +61,8 @@ public class JoinResponse extends Event {
         dout.writeInt(peerInfo.getPort());
     }
 
+    public PeerInfo getPeerInfo(){
+        return peerInfo;
+    }
     
 }

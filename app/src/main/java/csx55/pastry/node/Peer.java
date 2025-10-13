@@ -65,12 +65,14 @@ public class Peer implements Node {
     }
 
     private void processJoinResponse(Event event) {
+        JoinResponse joinResponse = (JoinResponse) event;
+        log.info(() -> "Received join response from --> " + joinResponse.getPeerInfo().toString());
         
     }
 
     private void processJoinRequest(Event event) {
         JoinRequest joinRequest = (JoinRequest) event;
-        log.info(() -> "Received join request for " + joinRequest.peerInfo.toString());
+        log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
         String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
 
@@ -101,7 +103,7 @@ public class Peer implements Node {
     }
 
     private void sendJoinResponse(PeerInfo joinPeerInfo, Leafset ls, RoutingTable rt) {
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, ls, rt);
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, myPeerInfo, ls, rt);
         try (Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());) {
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);

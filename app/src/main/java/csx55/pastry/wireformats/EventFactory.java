@@ -50,9 +50,10 @@ public class EventFactory {
     }
 
     private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo respondingPeer = readPeerInfo(dis);
         Leafset ls = readLeafset(dis);
         RoutingTable rt = readRoutingTable(dis);
-        return new JoinResponse(messageType, ls, rt);
+        return new JoinResponse(messageType, respondingPeer, ls, rt);
     }
 
     private Leafset readLeafset(DataInputStream dis) throws IOException {
