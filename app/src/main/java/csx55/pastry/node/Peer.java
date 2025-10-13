@@ -59,42 +59,80 @@ public class Peer implements Node {
             Protocol.REGISTER_RESPONSE, this::registerResponse,
             Protocol.DEREGISTER_RESPONSE, this::deregisterResponse,
             Protocol.ENTRY_NODE, this::processEntryNode,
-            Protocol.JOIN_REQUEST, this::processJoinRequest
+            Protocol.JOIN_REQUEST, this::processJoinRequest,
+            Protocol.JOIN_RESPONSE, this::processJoinResponse
         );
+    }
+
+    private void processJoinResponse(Event event) {
+        
     }
 
     private void processJoinRequest(Event event) {
         JoinRequest joinRequest = (JoinRequest) event;
         log.info(() -> "Received join request for " + joinRequest.peerInfo.toString());
-        PeerInfo joiningNodeInfo = joinRequest.peerInfo;
         String joiningHexId = joinRequest.peerInfo.getHexID();
+        PeerInfo joiningPeerInfo = joinRequest.peerInfo;
+
         PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
-        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls and it is closer than the joining node
-            log.info(() -> "Forwarding request to " + closestPeer.getHexID());
-            // fowardRequest(joinRequest, closestPeer);
-            // return;
+        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls and it is closer than the joining peer
+            log.info(() -> "Forwarding request to peer in leafset --> " + closestPeer.getHexID());
+            forwardRequest(joinRequest, closestPeer);
+            return;
         }
         int lmpl = longestMatchingPrefixLength(myHexID, joiningHexId);
         if(lmpl < 4) { // we are not the destination
             if(rt.getPeerInfo(lmpl, lmpl+1) != null) { // we can make a jump to peer in rt
                 PeerInfo rtPeer = rt.getPeerInfo(lmpl, lmpl+1);
-                log.info(() -> "Forwarding request to peer in routing table: " + rtPeer.getHexID());
-                // forwardRequest(joinRequest, rtPeer);
-                // return;
+                log.info(() -> "Forwarding request to peer in routing table --> " + rtPeer.getHexID());
+                forwardRequest(joinRequest, rtPeer);
+                return;
             }
+        }
+        PeerInfo closestOverallPeer = closestOverallPeer(joiningHexId);
+        if(closestOverallPeer != null && isCloser(joiningHexId, closestOverallPeer.getHexID(), myHexID)) { // if the closest overall peer is closer than the joining peer
+            log.info(() -> "Forwarding request to closest overall peer --> " + closestOverallPeer.getHexID());
+            forwardRequest(joinRequest, closestOverallPeer);
+            return;
+        }
+        // I am the closest peer to the joining peer
+        log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
+        sendJoinResponse(joiningPeerInfo, ls, rt);
+    }
+
+    private void sendJoinResponse(PeerInfo joinPeerInfo, Leafset ls, RoutingTable rt) {
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, ls, rt);
+        try (Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());) {
+            TCPConnection conn = new TCPConnection(socket, this);
+            socketToConn.put(socket, conn);
+            conn.startReceiverThread();
+            conn.sender.sendData(joinResponse.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
+        }
+    }
+
+    private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
+        try (Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());) {
+            TCPConnection conn = new TCPConnection(socket, this);
+            socketToConn.put(socket, conn);
+            conn.startReceiverThread();
+            conn.sender.sendData(joinRequest.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
         }
     }
 
     private PeerInfo closestOverallPeer(String joiningNodeHexId) {
         PeerInfo closestOverallPeer = null;
-        long minDistance = -1;
+        long minDistance = -Long.MAX_VALUE;
         long joiningNodeVal = Long.parseLong(joiningNodeHexId, 16);
         List<PeerInfo> allPeers = rt.getAllPeers();
         allPeers.addAll(ls.getAllPeers());
         for(PeerInfo peer : allPeers) {
             long currPeerVal = Long.parseLong(peer.getHexID(), 16);
             long distance = Math.abs(joiningNodeVal - currPeerVal);
-            if(closestOverallPeer == null || distance < minDistance){
+            if(distance < minDistance){
                 minDistance = distance;
                 closestOverallPeer = peer;
             }
@@ -121,9 +159,8 @@ public class Peer implements Node {
     }
 
     private void sendJoinRequest(String host, int port) {
-        try {
-            JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
-            Socket socket = new Socket(host, port);
+        JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
+        try (Socket socket = new Socket(host, port);) {
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);
             conn.startReceiverThread();

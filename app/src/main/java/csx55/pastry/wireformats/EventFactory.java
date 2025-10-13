@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.logging.*;
 
+import csx55.pastry.util.Leafset;
+import csx55.pastry.util.RoutingTable;
+
 public class EventFactory {
 
     private final static Logger log = Logger.getLogger(EventFactory.class.getName());
@@ -33,6 +36,8 @@ public class EventFactory {
                     return readEntryNode(messageType, dis);
                 case Protocol.JOIN_REQUEST:
                     return readJoinRequest(messageType, dis);
+                case Protocol.JOIN_RESPONSE:
+                    return readJoinResponse(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -44,47 +49,55 @@ public class EventFactory {
         return null;
     }
 
-    private JoinRequest readJoinRequest(int messageType, DataInputStream dis){
-        try {
-            String hexID = readString(dis);
-            String ip = readString(dis);
-            int port = dis.readInt();
-            PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
-            return new JoinRequest(messageType, peerInfo);
-        } catch(IOException e) {
-            warning.accept(e);
-        }
-        warning.accept(null);
-        return null;
+    private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {
+        Leafset ls = readLeafset(dis);
+        RoutingTable rt = readRoutingTable(dis);
+        return new JoinResponse(messageType, ls, rt);
     }
 
-    private EntryNode readEntryNode(int messageType, DataInputStream dis) {
-        try {
-            String hexID = readString(dis);
-            String ip = readString(dis);
-            int port = dis.readInt();
-            PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
-            return new EntryNode(messageType, peerInfo);
-        } catch(IOException e) {
-            warning.accept(e);
+    private Leafset readLeafset(DataInputStream dis) throws IOException {
+        Leafset ls = new Leafset();
+        int lsLength = dis.readInt();
+        for(int i = 0; i < lsLength; i++) {
+            PeerInfo peer = readPeerInfo(dis);
+            ls.addPeer(peer);
         }
-        warning.accept(null);
-        return null;
+        return ls;
     }
 
-    private Event readRegisterRequest(int messageType, DataInputStream dis) {
-        try {
-            String hexID = readString(dis);
-            String ip = readString(dis);
-            int port = dis.readInt();
-            PeerInfo peerInfo = new PeerInfo(hexID, new ConnInfo(ip, port));
-            Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
-            return request;
-        } catch(IOException e) {
-            warning.accept(e);
+    private RoutingTable readRoutingTable(DataInputStream dis) throws IOException {
+        RoutingTable rt = new RoutingTable();
+        int rtLength = dis.readInt();
+        for(int k = 0; k < rtLength; k++) {
+            int i = dis.readInt();
+            int j = dis.readInt();
+            PeerInfo peer = readPeerInfo(dis);
+            rt.setPeerInfo(i, j, peer);
         }
-        warning.accept(null);
-        return null;
+        return rt;
+    }
+
+    private JoinRequest readJoinRequest(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo peerInfo = readPeerInfo(dis);
+        return new JoinRequest(messageType, peerInfo);
+    }
+
+    private EntryNode readEntryNode(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo peerInfo = readPeerInfo(dis);
+        return new EntryNode(messageType, peerInfo);
+    }
+
+    private Event readRegisterRequest(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo peerInfo = readPeerInfo(dis);
+        Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
+        return request;
+    }
+
+    private PeerInfo readPeerInfo(DataInputStream dis) throws IOException {
+        String hexID = readString(dis);
+        String ip = readString(dis);
+        int port = dis.readInt();
+        return new PeerInfo(hexID, new ConnInfo(ip, port));
     }
 
     private String readString(DataInputStream dis) throws IOException {

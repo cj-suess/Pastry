@@ -55,4 +55,8 @@ public class Leafset {
         }
         return peers;
     }
+
+    public int size() {
+        return neighbors.size();
+    }
 }
