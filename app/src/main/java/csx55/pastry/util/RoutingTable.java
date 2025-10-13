@@ -1,5 +1,8 @@
 package csx55.pastry.util;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import csx55.pastry.wireformats.PeerInfo;
 
 public class RoutingTable {
@@ -14,13 +17,14 @@ public class RoutingTable {
         return rt[row][col];
     }
 
-    public PeerInfo checkRoutingTable(int row){
-        for(int i = 0; i < rt.length; i++){
-            if(rt[row][i] != null) {
-                return rt[row][i];
+    public List<PeerInfo> getAllPeers() {
+        List<PeerInfo> peers = new ArrayList<>();
+        for(int i = 0; i < 4; i++) {
+            for(int j = 0; j < 16; j++) {
+                if(rt[i][j] != null) { peers.add(rt[i][j]); }
             }
         }
-        return null;
+        return peers;
     }
 
     // print table method

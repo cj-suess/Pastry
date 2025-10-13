@@ -1,0 +1,62 @@
+package csx55.pastry.wireformats;
+
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.List;
+
+import csx55.pastry.util.Leafset;
+import csx55.pastry.util.RoutingTable;
+
+public class JoinResponse extends Event {
+
+    int messageType;
+    Leafset ls;
+    RoutingTable rt;
+
+    public JoinResponse(int messageType, Leafset ls, RoutingTable rt) {
+        this.messageType = messageType;
+        this.ls = ls;
+        this.rt = rt;
+    }
+
+    @Override
+    public int getType() {
+        return messageType;
+    }
+
+    @Override
+    void marshalData(DataOutputStream dout) throws IOException {
+        List<PeerInfo> lsList = ls.getAllPeers();
+        dout.writeInt(lsList.size());
+        writeLeafset(dout, lsList);
+        List<PeerInfo> rtList = rt.getAllPeers();
+        dout.writeInt(rtList.size());
+        writeRoutingTable(dout, rt);
+    }
+
+    private void writeLeafset(DataOutputStream dout, List<PeerInfo> ls) throws IOException {
+        for(PeerInfo p : ls){
+            writePeerInfo(dout, p);
+        }
+    }
+
+    private void writeRoutingTable(DataOutputStream dout, RoutingTable rt) throws IOException {
+        for(int i = 0; i < 16; i++){
+            for(int j = 0; j < 4; j++) {
+                if(rt.getPeerInfo(i,j) != null){
+                    dout.writeInt(i);
+                    dout.writeInt(j);
+                    writePeerInfo(dout, rt.getPeerInfo(i, j));
+                }
+            }
+        } 
+    }
+
+    private void writePeerInfo(DataOutputStream dout, PeerInfo peerInfo) throws IOException {
+        writeString(dout, peerInfo.getHexID());
+        writeString(dout, peerInfo.getIP());
+        dout.writeInt(peerInfo.getPort());
+    }
+
+    
+}
