@@ -4,6 +4,7 @@ import csx55.pastry.node.Node;
 import csx55.pastry.wireformats.*;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
@@ -34,8 +35,8 @@ public class TCPReceiverThread implements Runnable {
                 EventFactory ef = new EventFactory(data);
                 Event decodedEvent = ef.createEvent();
                 node.onEvent(decodedEvent, socket);
-            } catch(SocketException soe) {
-                LOG.warning("Socket exception caught reading data..." + soe.getLocalizedMessage());
+            } catch(SocketException | EOFException e) {
+                LOG.info("Connection closed by peer..." + socket.getRemoteSocketAddress());
                 break;
             } catch(IOException ioe) {
                 LOG.warning("IO exception caught reading data..." + ioe.getLocalizedMessage());

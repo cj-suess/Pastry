@@ -11,12 +11,14 @@ public class JoinResponse extends Event {
 
     private final int messageType;
     private final PeerInfo peerInfo;
+    private final String myHexId;
     private final Leafset ls;
     private final RoutingTable rt;
 
-    public JoinResponse(int messageType, PeerInfo peerInfo, Leafset ls, RoutingTable rt) {
+    public JoinResponse(int messageType, PeerInfo peerInfo, String myHexId, Leafset ls, RoutingTable rt) {
         this.messageType = messageType;
         this.peerInfo = peerInfo;
+        this.myHexId = myHexId;
         this.ls = ls;
         this.rt = rt;
     }
@@ -29,6 +31,7 @@ public class JoinResponse extends Event {
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
         writePeerInfo(dout, peerInfo);
+        writeString(dout, myHexId);
         List<PeerInfo> lsList = ls.getAllPeers();
         dout.writeInt(lsList.size());
         writeLeafset(dout, lsList);

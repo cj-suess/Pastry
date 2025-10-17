@@ -2,38 +2,35 @@ package csx55.pastry.util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
-
 import csx55.pastry.wireformats.*;
 
 public class Leafset {
-    
-    private TreeSet<PeerInfo> neighbors = new TreeSet<>();
 
-    public void addPeer(PeerInfo peerInfo) {
-        neighbors.add(peerInfo);
-    }
-    
-    public PeerInfo getlower(PeerInfo peerInfo) {
-        return neighbors.lower(peerInfo);
-    }
+    private PeerInfo lower;
+    private PeerInfo higher;
 
-    public PeerInfo getHigher(PeerInfo peerInfo) {
-        return neighbors.higher(peerInfo);
-    }
+    public void addPeer(PeerInfo joiningPeer, String myHexId) {
+        if(joiningPeer == null || joiningPeer.getHexID().equals(myHexId)) {
+            return;
+        }
 
-    public TreeSet<PeerInfo> getLeafSet() {
-        return neighbors;
+        long myVal = Long.parseLong(myHexId, 16);
+        long joiningVal = Long.parseLong(joiningPeer.getHexID(), 16);
+
+        if(joiningVal < myVal) { // potentiall new lower neighbor
+            if(lower == null || joiningVal > Long.parseLong(lower.getHexID(), 16)){
+                lower = joiningPeer;
+            }
+        } else if(joiningVal > myVal) {
+            if (higher == null || joiningVal < Long.parseLong(higher.getHexID(), 16)){
+                higher = joiningPeer;
+            }
+        }
     }
 
     public PeerInfo findClosestNeighbor(String joiningNodeHexId) {
 
-        if(neighbors.isEmpty()){ return null; }
-
-        PeerInfo joiningNodeInfo = new PeerInfo(joiningNodeHexId, null);
-        PeerInfo lower = neighbors.floor(joiningNodeInfo);
-        PeerInfo higher = neighbors.ceiling(joiningNodeInfo);
-
+        if(lower == null && higher == null){ return null; }
         if(lower == null) { return higher; } // if no smaller peer in ls return the higher peer
         if(higher == null || lower.equals(higher)) { return lower; } // if no higher peer in ls or lower and higher are the same then either only lower exists or an exact match was found
 
@@ -49,14 +46,24 @@ public class Leafset {
     }
 
     public List<PeerInfo> getAllPeers() {
-        List<PeerInfo> peers = new ArrayList<>();
-        for(PeerInfo peer : neighbors){
-            if(peer != null) { peers.add(peer); }
-        }
-        return peers;
+        List<PeerInfo> leafset = new ArrayList<>();
+        if(lower != null) { leafset.add(lower); }
+        if(higher != null) { leafset.add(higher); }
+        return leafset;
     }
 
     public int size() {
-        return neighbors.size();
+        int size = 0;
+        if(lower != null) { size++; }
+        if(higher != null) { size++; }
+        return size;
+    }
+
+    public PeerInfo getlower() {
+        return lower;
+    }
+
+    public PeerInfo getHigher() {
+        return higher;
     }
 }

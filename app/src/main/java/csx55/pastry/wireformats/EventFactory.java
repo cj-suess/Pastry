@@ -51,17 +51,18 @@ public class EventFactory {
 
     private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {
         PeerInfo respondingPeer = readPeerInfo(dis);
-        Leafset ls = readLeafset(dis);
+        String myHexId = readString(dis);
+        Leafset ls = readLeafset(dis, myHexId);
         RoutingTable rt = readRoutingTable(dis);
-        return new JoinResponse(messageType, respondingPeer, ls, rt);
+        return new JoinResponse(messageType, respondingPeer, myHexId, ls, rt);
     }
 
-    private Leafset readLeafset(DataInputStream dis) throws IOException {
+    private Leafset readLeafset(DataInputStream dis, String myHexId) throws IOException {
         Leafset ls = new Leafset();
         int lsLength = dis.readInt();
         for(int i = 0; i < lsLength; i++) {
             PeerInfo peer = readPeerInfo(dis);
-            ls.addPeer(peer);
+            ls.addPeer(peer, myHexId);
         }
         return ls;
     }

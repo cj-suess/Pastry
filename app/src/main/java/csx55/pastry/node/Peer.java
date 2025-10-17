@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.*;
 
@@ -25,8 +26,9 @@ public class Peer implements Node {
     RoutingTable rt = new RoutingTable();
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+    private Map<PeerInfo, TCPConnection> peerToConn = new ConcurrentHashMap<>();
 
-    private Map<Integer, Consumer<Event>> events = new HashMap<>();
+    private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private Map<String, Runnable> commands = new HashMap<>();
 
     public Peer(String host, int port, String hexID) {
@@ -47,8 +49,8 @@ public class Peer implements Node {
     @Override
     public void onEvent(Event event, Socket socket) {
         if(event != null) {
-            Consumer<Event> handler = events.get(event.getType());
-            handler.accept(event);
+            BiConsumer<Event, Socket> handler = events.get(event.getType());
+            handler.accept(event, socket);
         }
     }
 
@@ -62,7 +64,7 @@ public class Peer implements Node {
         );
     }
 
-    private void processJoinResponse(Event event) {
+    private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
         log.info(() -> "Received join response from --> " + joinResponse.getPeerInfo().toString());
         // update ls and rt
@@ -70,8 +72,10 @@ public class Peer implements Node {
         this.rt = joinResponse.getRoutingTable();
     }
 
-    private void processJoinRequest(Event event) {
+    private void processJoinRequest(Event event, Socket socket) {
         JoinRequest joinRequest = (JoinRequest) event;
+        TCPConnection conn = socketToConn.get(socket);
+        peerToConn.put(myPeerInfo, conn);
         log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
         String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
@@ -99,11 +103,11 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
-        sendJoinResponse(joiningPeerInfo, ls, rt);
+        sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
     }
 
-    private void sendJoinResponse(PeerInfo joinPeerInfo, Leafset ls, RoutingTable rt) {
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, myPeerInfo, ls, rt);
+    private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
         try {
             Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
             TCPConnection conn = new TCPConnection(socket, this);
@@ -155,7 +159,7 @@ public class Peer implements Node {
         return Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(closestPeerHexId, 16)) < Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(myHexId, 16));
     }
 
-    private void processEntryNode(Event event){
+    private void processEntryNode(Event event, Socket socket){
         EntryNode entryNode = (EntryNode) event;
         log.info(() -> "Received entry node from Discovery: " + entryNode.peerInfo.toString());
         log.info(() -> "Sending join request...");
@@ -175,13 +179,13 @@ public class Peer implements Node {
         }
     }
 
-    private void registerResponse(Event event) {
+    private void registerResponse(Event event, Socket socket) {
         log.info(() -> "Received register response from Discovery...");
         Message responseEvent = (Message) event; 
         log.info(() -> responseEvent.info);
     }
 
-    private void deregisterResponse(Event event) {
+    private void deregisterResponse(Event event, Socket socket) {
         log.info(() -> "Received deregister response from Discovery...");
         Message responseEvent = (Message) event;
         log.info(() -> responseEvent.info);
