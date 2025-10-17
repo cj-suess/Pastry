@@ -86,10 +86,11 @@ public class Peer implements Node {
             forwardRequest(joinRequest, closestPeer);
             return;
         }
-        int lmpl = longestMatchingPrefixLength(myHexID, joiningHexId);
-        if(lmpl < 4) { // we are not the destination
-            if(rt.getPeerInfo(lmpl, lmpl+1) != null) { // we can make a big jump in rt
-                PeerInfo rtPeer = rt.getPeerInfo(lmpl, lmpl+1);
+        int row = longestMatchingPrefixLength(myHexID, joiningHexId);
+        int col = Character.digit(joiningHexId.charAt(row+1), 16);
+        if(row < 4) { // we are not the destination
+            if(rt.getPeerInfo(row, col) != null) { // we can make a big jump in rt
+                PeerInfo rtPeer = rt.getPeerInfo(row, col);
                 log.info(() -> "Forwarding request to peer in routing table --> " + rtPeer.getHexID());
                 forwardRequest(joinRequest, rtPeer);
                 return;
@@ -103,8 +104,12 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
-        ls.addPeer(joiningPeerInfo, joiningHexId);
-        sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
+        ls.addPeer(joiningPeerInfo, myHexID);
+        log.info("LS SIZE: " + ls.size());
+        rt.setPeerInfo(row, col, joiningPeerInfo);
+        List<PeerInfo> test = rt.getAllPeers();
+        log.info("RT SIZE: " + test.size());
+        sendJoinResponse(myPeerInfo, myHexID, ls, rt);
     }
 
     private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
@@ -263,6 +268,11 @@ public class Peer implements Node {
         commands.put("exit", this::deregister);
         commands.put("id", this::printId);
         commands.put("leaf-set", this::printLeafset);
+        commands.put("routing-table", this::printRoutingTable);
+    }
+
+    private void printRoutingTable() {
+        System.out.println(rt.toString());
     }
 
     private void printLeafset(){

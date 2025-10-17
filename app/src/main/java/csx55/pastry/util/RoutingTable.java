@@ -27,6 +27,15 @@ public class RoutingTable {
         return peers;
     }
 
-    // print table method
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0; i < 4; i++) {
+            for(int j = 0; j < 16; j++) {
+                if(rt[i][j] != null) { sb.append((rt[i][j] + " : ")); }
+            }
+        }
+        return sb.toString();
+    }
 
 }

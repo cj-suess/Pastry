@@ -3,14 +3,22 @@ package csx55.pastry.util;
 import java.util.ArrayList;
 import java.util.List;
 import csx55.pastry.wireformats.*;
+import java.util.logging.*;
 
 public class Leafset {
+
+    private Logger log = Logger.getLogger(this.getClass().getName());
 
     private PeerInfo lower;
     private PeerInfo higher;
 
     public void addPeer(PeerInfo joiningPeer, String myHexId) {
-        if(joiningPeer == null || joiningPeer.getHexID().equals(myHexId)) {
+        if(joiningPeer == null) {
+            log.info("Could not add peer. Joining peer was null...");
+            return;
+        }
+        if(joiningPeer.getHexID().equals(myHexId)) {
+            log.info("Could not add peer. Joining peer hexID was my own...");
             return;
         }
 
