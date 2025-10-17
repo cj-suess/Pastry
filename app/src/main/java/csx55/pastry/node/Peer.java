@@ -49,8 +49,6 @@ public class Peer implements Node {
         if(event != null) {
             Consumer<Event> handler = events.get(event.getType());
             handler.accept(event);
-        } else {
-            warning.accept(null);
         }
     }
 
@@ -67,7 +65,9 @@ public class Peer implements Node {
     private void processJoinResponse(Event event) {
         JoinResponse joinResponse = (JoinResponse) event;
         log.info(() -> "Received join response from --> " + joinResponse.getPeerInfo().toString());
-        
+        // update ls and rt
+        this.ls = joinResponse.getLeafset();
+        this.rt = joinResponse.getRoutingTable();
     }
 
     private void processJoinRequest(Event event) {
@@ -77,14 +77,14 @@ public class Peer implements Node {
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
 
         PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
-        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls and it is closer than the joining peer
+        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls
             log.info(() -> "Forwarding request to peer in leafset --> " + closestPeer.getHexID());
             forwardRequest(joinRequest, closestPeer);
             return;
         }
         int lmpl = longestMatchingPrefixLength(myHexID, joiningHexId);
         if(lmpl < 4) { // we are not the destination
-            if(rt.getPeerInfo(lmpl, lmpl+1) != null) { // we can make a jump to peer in rt
+            if(rt.getPeerInfo(lmpl, lmpl+1) != null) { // we can make a big jump in rt
                 PeerInfo rtPeer = rt.getPeerInfo(lmpl, lmpl+1);
                 log.info(() -> "Forwarding request to peer in routing table --> " + rtPeer.getHexID());
                 forwardRequest(joinRequest, rtPeer);
@@ -104,7 +104,8 @@ public class Peer implements Node {
 
     private void sendJoinResponse(PeerInfo joinPeerInfo, Leafset ls, RoutingTable rt) {
         JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, myPeerInfo, ls, rt);
-        try (Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());) {
+        try {
+            Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);
             conn.startReceiverThread();
@@ -115,7 +116,8 @@ public class Peer implements Node {
     }
 
     private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
-        try (Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());) {
+        try {
+            Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);
             conn.startReceiverThread();
@@ -127,7 +129,7 @@ public class Peer implements Node {
 
     private PeerInfo closestOverallPeer(String joiningNodeHexId) {
         PeerInfo closestOverallPeer = null;
-        long minDistance = -Long.MAX_VALUE;
+        long minDistance = Long.MAX_VALUE;
         long joiningNodeVal = Long.parseLong(joiningNodeHexId, 16);
         List<PeerInfo> allPeers = rt.getAllPeers();
         allPeers.addAll(ls.getAllPeers());
@@ -162,7 +164,8 @@ public class Peer implements Node {
 
     private void sendJoinRequest(String host, int port) {
         JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
-        try (Socket socket = new Socket(host, port);) {
+        try {
+            Socket socket = new Socket(host, port);
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);
             conn.startReceiverThread();
@@ -238,7 +241,7 @@ public class Peer implements Node {
                 String command = scanner.nextLine();
                 commands.get(command).run();
             }
-        } 
+        }
     }
 
     private void startCommands() {

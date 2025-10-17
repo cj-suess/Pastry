@@ -44,8 +44,8 @@ public class JoinResponse extends Event {
     }
 
     private void writeRoutingTable(DataOutputStream dout, RoutingTable rt) throws IOException {
-        for(int i = 0; i < 16; i++){
-            for(int j = 0; j < 4; j++) {
+        for(int i = 0; i < 4; i++){
+            for(int j = 0; j < 16; j++) {
                 if(rt.getPeerInfo(i,j) != null){
                     dout.writeInt(i);
                     dout.writeInt(j);
@@ -63,6 +63,14 @@ public class JoinResponse extends Event {
 
     public PeerInfo getPeerInfo(){
         return peerInfo;
+    }
+
+    public RoutingTable getRoutingTable(){
+        return rt;
+    }
+
+    public Leafset getLeafset() {
+        return ls;
     }
     
 }
