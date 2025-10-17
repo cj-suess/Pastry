@@ -66,4 +66,16 @@ public class Leafset {
     public PeerInfo getHigher() {
         return higher;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        if(lower != null){
+            sb.append(lower.toString() + "\n");
+        }
+        if(higher != null) {
+            sb.append(higher.toString() + "\n");
+        }
+        return sb.toString();
+    }
 }

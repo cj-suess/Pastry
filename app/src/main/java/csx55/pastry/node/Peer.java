@@ -103,16 +103,22 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
+        ls.addPeer(joiningPeerInfo, joiningHexId);
         sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
     }
 
     private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
         JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
         try {
-            Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
-            TCPConnection conn = new TCPConnection(socket, this);
-            socketToConn.put(socket, conn);
-            conn.startReceiverThread();
+            TCPConnection conn = peerToConn.get(joinPeerInfo);
+            if(conn == null){
+                Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(joinPeerInfo, conn);
+                log.info("Opened new connection to -> " + joinPeerInfo.toString());
+            }
             conn.sender.sendData(joinResponse.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -121,10 +127,15 @@ public class Peer implements Node {
 
     private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
         try {
-            Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
-            TCPConnection conn = new TCPConnection(socket, this);
-            socketToConn.put(socket, conn);
-            conn.startReceiverThread();
+            TCPConnection conn = peerToConn.get(peerInfo);
+            if(conn == null){
+                Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(peerInfo, conn);
+                log.info("Opened new connection to -> " + peerInfo.toString());
+            }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -250,6 +261,16 @@ public class Peer implements Node {
 
     private void startCommands() {
         commands.put("exit", this::deregister);
+        commands.put("id", this::printId);
+        commands.put("leaf-set", this::printLeafset);
+    }
+
+    private void printLeafset(){
+        System.out.print(ls.toString());
+    }
+
+    private void printId(){
+        System.out.println(myHexID);
     }
 
     public static void main(String[] args) {
