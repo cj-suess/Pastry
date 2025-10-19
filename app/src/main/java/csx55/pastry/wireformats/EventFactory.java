@@ -37,6 +37,8 @@ public class EventFactory {
                     return readJoinRequest(messageType, dis);
                 case Protocol.JOIN_RESPONSE:
                     return readJoinResponse(messageType, dis);
+                case Protocol.UPDATE:
+                    return readUpdateMessage(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -46,6 +48,21 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private Update readUpdateMessage(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo updatePeer = readPeerInfo(dis);
+        List<PeerInfo> peers = readPeers(dis);
+        return new Update(messageType, updatePeer, peers);
+    }
+
+    private List<PeerInfo> readPeers(DataInputStream dis) throws IOException {
+        List<PeerInfo> peers = new ArrayList<>();
+        int peersLength = dis.readInt();
+        for(int i = 0; i < peersLength; i++) {
+            peers.add(readPeerInfo(dis));
+        }
+        return peers;
     }
 
     private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {

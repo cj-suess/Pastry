@@ -9,4 +9,5 @@ public interface Protocol {
     int JOIN_REQUEST = 6;
     int JOIN_RESPONSE = 7;
     int NODE_ID = 8;
+    int UPDATE = 9;
 }
