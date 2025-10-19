@@ -100,12 +100,19 @@ public class Discover implements Node {
         }
     }
 
-    public void readTerminal() {
+    private void readTerminal() {
         try(Scanner scanner = new Scanner(System.in)) {
-            while(running) {
+            while(true) {
                 String command = scanner.nextLine();
-                commands.get(command).run();
+                Runnable cmd = commands.get(command);
+                if(cmd == null) {
+                    log.info(() -> "Please enter a valid command.");
+                } else {
+                    cmd.run();
+                }
             }
+        } catch(NullPointerException e) {
+            warning.accept(e);
         }
     }
 

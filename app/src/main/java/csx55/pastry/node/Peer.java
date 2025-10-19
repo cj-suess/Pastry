@@ -283,7 +283,12 @@ public class Peer implements Node {
         try(Scanner scanner = new Scanner(System.in)) {
             while(true) {
                 String command = scanner.nextLine();
-                commands.get(command).run();
+                Runnable cmd = commands.get(command);
+                if(cmd == null) {
+                    log.info(() -> "Please enter a valid command.");
+                } else {
+                    cmd.run();
+                }
             }
         } catch(NullPointerException e) {
             warning.accept(e);
