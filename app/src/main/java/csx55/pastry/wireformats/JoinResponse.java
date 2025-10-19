@@ -4,19 +4,20 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-import csx55.pastry.util.Leafset;
-import csx55.pastry.util.RoutingTable;
-
 public class JoinResponse extends Event {
 
-    int messageType;
-    Leafset ls;
-    RoutingTable rt;
+    private final int messageType;
+    private final PeerInfo peerInfo;
+    private final String myHexId;
+    private final List<PeerInfo> leafsetList;
+    private final List<PeerInfo> rtList;
 
-    public JoinResponse(int messageType, Leafset ls, RoutingTable rt) {
+    public JoinResponse(int messageType, PeerInfo peerInfo, String myHexId, List<PeerInfo> leafseList, List<PeerInfo> rtList) {
         this.messageType = messageType;
-        this.ls = ls;
-        this.rt = rt;
+        this.peerInfo = peerInfo;
+        this.myHexId = myHexId;
+        this.leafsetList = leafseList;
+        this.rtList = rtList;
     }
 
     @Override
@@ -26,12 +27,12 @@ public class JoinResponse extends Event {
 
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
-        List<PeerInfo> lsList = ls.getAllPeers();
-        dout.writeInt(lsList.size());
-        writeLeafset(dout, lsList);
-        List<PeerInfo> rtList = rt.getAllPeers();
+        writePeerInfo(dout, peerInfo);
+        writeString(dout, myHexId);
+        dout.writeInt(leafsetList.size());
+        writeLeafset(dout, leafsetList);
         dout.writeInt(rtList.size());
-        writeRoutingTable(dout, rt);
+        writeRoutingTable(dout, rtList);
     }
 
     private void writeLeafset(DataOutputStream dout, List<PeerInfo> ls) throws IOException {
@@ -40,15 +41,9 @@ public class JoinResponse extends Event {
         }
     }
 
-    private void writeRoutingTable(DataOutputStream dout, RoutingTable rt) throws IOException {
-        for(int i = 0; i < 16; i++){
-            for(int j = 0; j < 4; j++) {
-                if(rt.getPeerInfo(i,j) != null){
-                    dout.writeInt(i);
-                    dout.writeInt(j);
-                    writePeerInfo(dout, rt.getPeerInfo(i, j));
-                }
-            }
+    private void writeRoutingTable(DataOutputStream dout, List<PeerInfo> rt) throws IOException {
+        for(PeerInfo p : rt){
+            writePeerInfo(dout, p);
         } 
     }
 
@@ -58,5 +53,16 @@ public class JoinResponse extends Event {
         dout.writeInt(peerInfo.getPort());
     }
 
+    public PeerInfo getPeerInfo(){
+        return peerInfo;
+    }
+
+    public List<PeerInfo> getRoutingTable(){
+        return rtList;
+    }
+
+    public List<PeerInfo> getLeafset() {
+        return leafsetList;
+    }
     
 }

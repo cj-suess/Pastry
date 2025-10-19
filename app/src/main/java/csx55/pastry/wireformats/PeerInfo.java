@@ -4,8 +4,8 @@ import java.util.Objects;
 
 public class PeerInfo implements Comparable<PeerInfo> {
 
-    public final String hexID;
-    public final ConnInfo conn;
+    private final String hexID;
+    private final ConnInfo conn;
     
     public PeerInfo(String hexID, ConnInfo conn){
         this.hexID = hexID;

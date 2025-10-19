@@ -8,4 +8,5 @@ public interface Protocol {
     int ENTRY_NODE = 5;
     int JOIN_REQUEST = 6;
     int JOIN_RESPONSE = 7;
+    int NODE_ID = 8;
 }

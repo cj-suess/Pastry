@@ -176,12 +176,6 @@ public class Discover implements Node {
         }
     }
 
-    // store registered nodes (16-bit identifier, NodeID, nickname)
-
-    // detect collision
-
-    // return random registered node
-
     public static void main(String[] args) {
         LogConfig.init(Level.INFO);
         Discover discovery = new Discover(Integer.parseInt(args[0]));

@@ -3,11 +3,10 @@ package csx55.pastry.wireformats;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.logging.*;
-
-import csx55.pastry.util.Leafset;
-import csx55.pastry.util.RoutingTable;
 
 public class EventFactory {
 
@@ -50,31 +49,29 @@ public class EventFactory {
     }
 
     private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {
-        Leafset ls = readLeafset(dis);
-        RoutingTable rt = readRoutingTable(dis);
-        return new JoinResponse(messageType, ls, rt);
+        PeerInfo respondingPeer = readPeerInfo(dis);
+        String myHexId = readString(dis);
+        List<PeerInfo> leafsetList = readLeafset(dis);
+        List<PeerInfo> rtList = readRoutingTable(dis);
+        return new JoinResponse(messageType, respondingPeer, myHexId, leafsetList, rtList);
     }
 
-    private Leafset readLeafset(DataInputStream dis) throws IOException {
-        Leafset ls = new Leafset();
+    private List<PeerInfo> readLeafset(DataInputStream dis) throws IOException {
+        List<PeerInfo> leafsetList = new ArrayList<>();
         int lsLength = dis.readInt();
         for(int i = 0; i < lsLength; i++) {
-            PeerInfo peer = readPeerInfo(dis);
-            ls.addPeer(peer);
+            leafsetList.add(readPeerInfo(dis));
         }
-        return ls;
+        return leafsetList;
     }
 
-    private RoutingTable readRoutingTable(DataInputStream dis) throws IOException {
-        RoutingTable rt = new RoutingTable();
+    private List<PeerInfo> readRoutingTable(DataInputStream dis) throws IOException {
+        List<PeerInfo> rtList = new ArrayList<>();
         int rtLength = dis.readInt();
-        for(int k = 0; k < rtLength; k++) {
-            int i = dis.readInt();
-            int j = dis.readInt();
-            PeerInfo peer = readPeerInfo(dis);
-            rt.setPeerInfo(i, j, peer);
+        for(int i = 0; i < rtLength; i++) {
+            rtList.add(readPeerInfo(dis));
         }
-        return rt;
+        return rtList;
     }
 
     private JoinRequest readJoinRequest(int messageType, DataInputStream dis) throws IOException {

@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.*;
 
@@ -25,8 +26,9 @@ public class Peer implements Node {
     RoutingTable rt = new RoutingTable();
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+    private Map<PeerInfo, TCPConnection> peerToConn = new ConcurrentHashMap<>();
 
-    private Map<Integer, Consumer<Event>> events = new HashMap<>();
+    private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private Map<String, Runnable> commands = new HashMap<>();
 
     public Peer(String host, int port, String hexID) {
@@ -47,10 +49,8 @@ public class Peer implements Node {
     @Override
     public void onEvent(Event event, Socket socket) {
         if(event != null) {
-            Consumer<Event> handler = events.get(event.getType());
-            handler.accept(event);
-        } else {
-            warning.accept(null);
+            BiConsumer<Event, Socket> handler = events.get(event.getType());
+            handler.accept(event, socket);
         }
     }
 
@@ -64,26 +64,56 @@ public class Peer implements Node {
         );
     }
 
-    private void processJoinResponse(Event event) {
+    private void processJoinResponse(Event event, Socket socket) {
+        JoinResponse joinResponse = (JoinResponse) event;
+        PeerInfo joiningPeerInfo = joinResponse.getPeerInfo();
+        log.info(() -> "Received join response from --> " + joiningPeerInfo.toString());
         
+        updateTables(joiningPeerInfo); // add joining peer to ls
+
+        for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's leafset
+            updateTables(p);
+        }
+
+        for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's routing table
+            updateTables(p);
+        }
     }
 
-    private void processJoinRequest(Event event) {
+    private void updateTables(PeerInfo joiningPeerInfo) {
+        if(joiningPeerInfo.getHexID().equals(myHexID)) { // dont' add myself
+            return;
+        }
+        ls.addPeer(joiningPeerInfo, myHexID); // add to ls (will only add if it is able to update one of my current neighbors)
+        // now update routing table with any peer that I can use
+        int row = longestMatchingPrefixLength(myHexID, joiningPeerInfo.getHexID());
+        if(row < 4) { // don't add myself
+            int col = Character.digit(joiningPeerInfo.getHexID().charAt(row), 16);
+            if(rt.getPeerInfo(row, col) == null) {
+                rt.setPeerInfo(row, col, joiningPeerInfo);
+            }
+        }
+    }
+
+    private void processJoinRequest(Event event, Socket socket) {
         JoinRequest joinRequest = (JoinRequest) event;
-        log.info(() -> "Received join request for " + joinRequest.peerInfo.toString());
+        log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
         String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
+        TCPConnection conn = socketToConn.get(socket);
+        peerToConn.put(joiningPeerInfo, conn);
 
         PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
-        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls and it is closer than the joining peer
+        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls
             log.info(() -> "Forwarding request to peer in leafset --> " + closestPeer.getHexID());
             forwardRequest(joinRequest, closestPeer);
             return;
         }
-        int lmpl = longestMatchingPrefixLength(myHexID, joiningHexId);
-        if(lmpl < 4) { // we are not the destination
-            if(rt.getPeerInfo(lmpl, lmpl+1) != null) { // we can make a jump to peer in rt
-                PeerInfo rtPeer = rt.getPeerInfo(lmpl, lmpl+1);
+        int row = longestMatchingPrefixLength(myHexID, joiningHexId);
+        int col = Character.digit(joiningHexId.charAt(row), 16);
+        if(row < 4) { // we are not the destination
+            if(rt.getPeerInfo(row, col) != null) { // we can make a big jump in rt
+                PeerInfo rtPeer = rt.getPeerInfo(row, col);
                 log.info(() -> "Forwarding request to peer in routing table --> " + rtPeer.getHexID());
                 forwardRequest(joinRequest, rtPeer);
                 return;
@@ -97,15 +127,27 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
-        sendJoinResponse(joiningPeerInfo, ls, rt);
+        ls.addPeer(joiningPeerInfo, myHexID);
+        rt.setPeerInfo(row, col, joiningPeerInfo);
+        sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
     }
 
-    private void sendJoinResponse(PeerInfo joinPeerInfo, Leafset ls, RoutingTable rt) {
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_REQUEST, ls, rt);
-        try (Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());) {
-            TCPConnection conn = new TCPConnection(socket, this);
-            socketToConn.put(socket, conn);
-            conn.startReceiverThread();
+    private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
+        List<PeerInfo> leafsetList = ls.getAllPeers();
+        leafsetList.remove(joinPeerInfo);
+        List<PeerInfo> rtList = rt.getAllPeers();
+        rtList.remove(joinPeerInfo);
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, leafsetList, rtList);
+        try {
+            TCPConnection conn = peerToConn.get(joinPeerInfo);
+            if(conn == null){
+                Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(joinPeerInfo, conn);
+                log.info("Opened new connection to -> " + joinPeerInfo.toString());
+            }
             conn.sender.sendData(joinResponse.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -113,10 +155,16 @@ public class Peer implements Node {
     }
 
     private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
-        try (Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());) {
-            TCPConnection conn = new TCPConnection(socket, this);
-            socketToConn.put(socket, conn);
-            conn.startReceiverThread();
+        try {
+            TCPConnection conn = peerToConn.get(peerInfo);
+            if(conn == null){
+                Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(peerInfo, conn);
+                log.info("Opened new connection to -> " + peerInfo.toString());
+            }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -125,7 +173,7 @@ public class Peer implements Node {
 
     private PeerInfo closestOverallPeer(String joiningNodeHexId) {
         PeerInfo closestOverallPeer = null;
-        long minDistance = -Long.MAX_VALUE;
+        long minDistance = Long.MAX_VALUE;
         long joiningNodeVal = Long.parseLong(joiningNodeHexId, 16);
         List<PeerInfo> allPeers = rt.getAllPeers();
         allPeers.addAll(ls.getAllPeers());
@@ -151,7 +199,7 @@ public class Peer implements Node {
         return Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(closestPeerHexId, 16)) < Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(myHexId, 16));
     }
 
-    private void processEntryNode(Event event){
+    private void processEntryNode(Event event, Socket socket){
         EntryNode entryNode = (EntryNode) event;
         log.info(() -> "Received entry node from Discovery: " + entryNode.peerInfo.toString());
         log.info(() -> "Sending join request...");
@@ -160,7 +208,8 @@ public class Peer implements Node {
 
     private void sendJoinRequest(String host, int port) {
         JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
-        try (Socket socket = new Socket(host, port);) {
+        try {
+            Socket socket = new Socket(host, port);
             TCPConnection conn = new TCPConnection(socket, this);
             socketToConn.put(socket, conn);
             conn.startReceiverThread();
@@ -170,13 +219,13 @@ public class Peer implements Node {
         }
     }
 
-    private void registerResponse(Event event) {
+    private void registerResponse(Event event, Socket socket) {
         log.info(() -> "Received register response from Discovery...");
         Message responseEvent = (Message) event; 
         log.info(() -> responseEvent.info);
     }
 
-    private void deregisterResponse(Event event) {
+    private void deregisterResponse(Event event, Socket socket) {
         log.info(() -> "Received deregister response from Discovery...");
         Message responseEvent = (Message) event;
         log.info(() -> responseEvent.info);
@@ -236,11 +285,28 @@ public class Peer implements Node {
                 String command = scanner.nextLine();
                 commands.get(command).run();
             }
-        } 
+        } catch(NullPointerException e) {
+            warning.accept(e);
+        }
     }
 
     private void startCommands() {
         commands.put("exit", this::deregister);
+        commands.put("id", this::printId);
+        commands.put("leaf-set", this::printLeafset);
+        commands.put("routing-table", this::printRoutingTable);
+    }
+
+    private void printRoutingTable() {
+        System.out.println(rt.toString());
+    }
+
+    private void printLeafset(){
+        System.out.print(ls.toString());
+    }
+
+    private void printId(){
+        System.out.println(myHexID);
     }
 
     public static void main(String[] args) {
