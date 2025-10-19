@@ -100,8 +100,6 @@ public class Peer implements Node {
         log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
         String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
-        TCPConnection conn = socketToConn.get(socket);
-        peerToConn.put(joiningPeerInfo, conn);
 
         PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
         if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls
@@ -127,8 +125,7 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
-        ls.addPeer(joiningPeerInfo, myHexID);
-        rt.setPeerInfo(row, col, joiningPeerInfo);
+        updateTables(joiningPeerInfo);
         sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
     }
 
