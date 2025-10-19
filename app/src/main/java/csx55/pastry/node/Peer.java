@@ -66,19 +66,42 @@ public class Peer implements Node {
 
     private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
-        log.info(() -> "Received join response from --> " + joinResponse.getPeerInfo().toString());
-        // update ls and rt
-        this.ls = joinResponse.getLeafset();
-        this.rt = joinResponse.getRoutingTable();
+        PeerInfo joiningPeerInfo = joinResponse.getPeerInfo();
+        log.info(() -> "Received join response from --> " + joiningPeerInfo.toString());
+        
+        updateTables(joiningPeerInfo); // add joining peer to ls
+
+        for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's leafset
+            updateTables(p);
+        }
+
+        for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's routing table
+            updateTables(p);
+        }
+    }
+
+    private void updateTables(PeerInfo joiningPeerInfo) {
+        if(joiningPeerInfo.getHexID().equals(myHexID)) { // dont' add myself
+            return;
+        }
+        ls.addPeer(joiningPeerInfo, myHexID); // add to ls (will only add if it is able to update one of my current neighbors)
+        // now update routing table with any peer that I can use
+        int row = longestMatchingPrefixLength(myHexID, joiningPeerInfo.getHexID());
+        if(row < 4) { // don't add myself
+            int col = Character.digit(joiningPeerInfo.getHexID().charAt(row), 16);
+            if(rt.getPeerInfo(row, col) == null) {
+                rt.setPeerInfo(row, col, joiningPeerInfo);
+            }
+        }
     }
 
     private void processJoinRequest(Event event, Socket socket) {
         JoinRequest joinRequest = (JoinRequest) event;
-        TCPConnection conn = socketToConn.get(socket);
-        peerToConn.put(myPeerInfo, conn);
         log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
         String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
+        TCPConnection conn = socketToConn.get(socket);
+        peerToConn.put(joiningPeerInfo, conn);
 
         PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
         if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls
@@ -87,7 +110,7 @@ public class Peer implements Node {
             return;
         }
         int row = longestMatchingPrefixLength(myHexID, joiningHexId);
-        int col = Character.digit(joiningHexId.charAt(row+1), 16);
+        int col = Character.digit(joiningHexId.charAt(row), 16);
         if(row < 4) { // we are not the destination
             if(rt.getPeerInfo(row, col) != null) { // we can make a big jump in rt
                 PeerInfo rtPeer = rt.getPeerInfo(row, col);
@@ -105,15 +128,16 @@ public class Peer implements Node {
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
         ls.addPeer(joiningPeerInfo, myHexID);
-        log.info("LS SIZE: " + ls.size());
         rt.setPeerInfo(row, col, joiningPeerInfo);
-        List<PeerInfo> test = rt.getAllPeers();
-        log.info("RT SIZE: " + test.size());
-        sendJoinResponse(myPeerInfo, myHexID, ls, rt);
+        sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
     }
 
     private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
+        List<PeerInfo> leafsetList = ls.getAllPeers();
+        leafsetList.remove(joinPeerInfo);
+        List<PeerInfo> rtList = rt.getAllPeers();
+        rtList.remove(joinPeerInfo);
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, leafsetList, rtList);
         try {
             TCPConnection conn = peerToConn.get(joinPeerInfo);
             if(conn == null){
@@ -261,6 +285,8 @@ public class Peer implements Node {
                 String command = scanner.nextLine();
                 commands.get(command).run();
             }
+        } catch(NullPointerException e) {
+            warning.accept(e);
         }
     }
 

@@ -27,10 +27,12 @@ public class Leafset {
 
         if(joiningVal < myVal) { // potentiall new lower neighbor
             if(lower == null || joiningVal > Long.parseLong(lower.getHexID(), 16)){
+                log.info(() -> "Updating lower neighbor with --> " + joiningPeer.getHexID());
                 lower = joiningPeer;
             }
         } else if(joiningVal > myVal) {
             if (higher == null || joiningVal < Long.parseLong(higher.getHexID(), 16)){
+                log.info(() -> "Updating higher neighbor with --> " + joiningPeer.getHexID());
                 higher = joiningPeer;
             }
         }
