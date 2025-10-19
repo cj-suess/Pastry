@@ -60,8 +60,16 @@ public class Peer implements Node {
             Protocol.DEREGISTER_RESPONSE, this::deregisterResponse,
             Protocol.ENTRY_NODE, this::processEntryNode,
             Protocol.JOIN_REQUEST, this::processJoinRequest,
-            Protocol.JOIN_RESPONSE, this::processJoinResponse
+            Protocol.JOIN_RESPONSE, this::processJoinResponse, 
+            Protocol.UPDATE, this::processUpdate
         );
+    }
+
+    private void processUpdate(Event event, Socket socket) {
+        Update update = (Update) event;
+        for(PeerInfo p : update.getPeers()) {
+            updateTables(p);
+        }
     }
 
     private void processJoinResponse(Event event, Socket socket) {
@@ -69,14 +77,43 @@ public class Peer implements Node {
         PeerInfo joiningPeerInfo = joinResponse.getPeerInfo();
         log.info(() -> "Received join response from --> " + joiningPeerInfo.toString());
         
-        updateTables(joiningPeerInfo); // add joining peer to ls
+        updateTables(joiningPeerInfo); // update LS with joining peer
 
-        for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's leafset
+        for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's LS
             updateTables(p);
         }
 
-        for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's routing table
+        for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's RT
             updateTables(p);
+        }
+
+        updatePeers(); // update all nodes in LS and RT
+    }
+
+    private void updatePeers() {
+        List<PeerInfo> peers = ls.getAllPeers();
+        peers.addAll(rt.getAllPeers());
+        for(PeerInfo p : peers) {
+            log.info(() -> "Sending update message to --> " + p.getHexID());
+            sendUpdateMessage(p, peers);
+        }
+    }
+
+    private void sendUpdateMessage(PeerInfo p, List<PeerInfo> peers) {
+        Update update = new Update(Protocol.UPDATE, myPeerInfo, peers);
+        try {
+            TCPConnection conn = peerToConn.get(p);
+            if(conn == null){
+                Socket socket = new Socket(p.getIP(), p.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(p, conn);
+                log.info("Opened new connection to -> " + p.toString());
+            }
+            conn.sender.sendData(update.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
         }
     }
 
