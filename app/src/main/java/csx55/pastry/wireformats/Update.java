@@ -43,5 +43,9 @@ public class Update extends Event {
     public List<PeerInfo> getPeers() {
         return peers;
     }
+
+    public PeerInfo getMyPeerInfo() {
+        return myPeerInfo;
+    }
     
 }
