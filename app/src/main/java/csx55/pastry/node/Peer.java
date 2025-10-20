@@ -67,6 +67,9 @@ public class Peer implements Node {
 
     private void processUpdate(Event event, Socket socket) {
         Update update = (Update) event;
+        PeerInfo peerInfo = update.getMyPeerInfo();
+        log.info(() -> "Received update message from --> " + peerInfo.toString());
+        updateTables(peerInfo);
         for(PeerInfo p : update.getPeers()) {
             updateTables(p);
         }
@@ -91,8 +94,8 @@ public class Peer implements Node {
     }
 
     private void updatePeers() {
-        List<PeerInfo> peers = ls.getAllPeers();
-        peers.addAll(rt.getAllPeers());
+        List<PeerInfo> peers = rt.getAllPeers();
+        peers.addAll(ls.getAllPeers());
         for(PeerInfo p : peers) {
             log.info(() -> "Sending update message to --> " + p.getHexID());
             sendUpdateMessage(p, peers);
@@ -109,7 +112,6 @@ public class Peer implements Node {
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
                 peerToConn.put(p, conn);
-                log.info("Opened new connection to -> " + p.toString());
             }
             conn.sender.sendData(update.getBytes());
         } catch(IOException e) {
@@ -180,7 +182,6 @@ public class Peer implements Node {
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
                 peerToConn.put(joinPeerInfo, conn);
-                log.info("Opened new connection to -> " + joinPeerInfo.toString());
             }
             conn.sender.sendData(joinResponse.getBytes());
         } catch(IOException e) {
@@ -197,7 +198,6 @@ public class Peer implements Node {
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
                 peerToConn.put(peerInfo, conn);
-                log.info("Opened new connection to -> " + peerInfo.toString());
             }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
@@ -233,20 +233,24 @@ public class Peer implements Node {
         return Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(closestPeerHexId, 16)) < Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(myHexId, 16));
     }
 
-    private void processEntryNode(Event event, Socket socket){
+    private void processEntryNode(Event event, Socket socket) {
         EntryNode entryNode = (EntryNode) event;
         log.info(() -> "Received entry node from Discovery: " + entryNode.peerInfo.toString());
         log.info(() -> "Sending join request...");
-        sendJoinRequest(entryNode.peerInfo.getIP(), entryNode.peerInfo.getPort());
+        sendJoinRequest(entryNode.peerInfo);
     }
 
-    private void sendJoinRequest(String host, int port) {
+    private void sendJoinRequest(PeerInfo entryNode) {
         JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
         try {
-            Socket socket = new Socket(host, port);
-            TCPConnection conn = new TCPConnection(socket, this);
-            socketToConn.put(socket, conn);
-            conn.startReceiverThread();
+            TCPConnection conn = peerToConn.get(entryNode);
+            if(conn == null) {
+                Socket socket = new Socket(entryNode.getIP(), entryNode.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(entryNode, conn);
+            }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -254,15 +258,15 @@ public class Peer implements Node {
     }
 
     private void registerResponse(Event event, Socket socket) {
-        log.info(() -> "Received register response from Discovery...");
-        Message responseEvent = (Message) event; 
-        log.info(() -> responseEvent.info);
+        // log.info(() -> "Received register response from Discovery...");
+        // Message responseEvent = (Message) event; 
+        // log.info(() -> responseEvent.info);
     }
 
     private void deregisterResponse(Event event, Socket socket) {
-        log.info(() -> "Received deregister response from Discovery...");
-        Message responseEvent = (Message) event;
-        log.info(() -> responseEvent.info);
+        // log.info(() -> "Received deregister response from Discovery...");
+        // Message responseEvent = (Message) event;
+        // log.info(() -> responseEvent.info);
     }
 
     private void register() {
@@ -334,6 +338,13 @@ public class Peer implements Node {
         commands.put("id", this::printId);
         commands.put("leaf-set", this::printLeafset);
         commands.put("routing-table", this::printRoutingTable);
+        commands.put("print-connections", this::printConnections);
+    }
+
+    private void printConnections() {
+        for(Map.Entry<PeerInfo, TCPConnection> conn : peerToConn.entrySet()) {
+            log.info(() -> conn.getKey().toString());
+        }
     }
 
     private void printRoutingTable() {

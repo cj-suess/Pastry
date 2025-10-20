@@ -11,6 +11,15 @@ public class Leafset {
 
     private PeerInfo lower;
     private PeerInfo higher;
+    private long MAX_ID = 65536;
+
+    private long calculateDistance(long from, long to) { // calculate the clockwise distance between two peers
+        if(to >= from) {
+            return to - from;
+        } else { // wrap around
+            return MAX_ID - from + to;
+        }
+    }
 
     public void addPeer(PeerInfo joiningPeer, String myHexId) {
         if(joiningPeer == null) {
@@ -24,16 +33,30 @@ public class Leafset {
 
         long myVal = Long.parseLong(myHexId, 16);
         long joiningVal = Long.parseLong(joiningPeer.getHexID(), 16);
+        long distanceToJoining = calculateDistance(myVal, joiningVal);
 
-        if(joiningVal < myVal) { // potentiall new lower neighbor
-            if(lower == null || joiningVal > Long.parseLong(lower.getHexID(), 16)){
-                log.info(() -> "Updating lower neighbor with --> " + joiningPeer.getHexID());
-                lower = joiningPeer;
-            }
-        } else if(joiningVal > myVal) {
-            if (higher == null || joiningVal < Long.parseLong(higher.getHexID(), 16)){
-                log.info(() -> "Updating higher neighbor with --> " + joiningPeer.getHexID());
+        if(distanceToJoining <= MAX_ID / 2) { // potentiall new higher neighbor
+            if(higher == null) {
+                log.info(() -> "Setting higher initially to --> " + joiningVal);
                 higher = joiningPeer;
+            } else {
+                long distanceToCurrentHigher = calculateDistance(myVal, Long.parseLong(higher.getHexID(), 16));
+                if(distanceToJoining < distanceToCurrentHigher) {
+                    log.info(() -> "Updating higher neighbor to --> " + joiningPeer.getHexID());
+                    higher = joiningPeer;
+                }
+            }
+        } else { // check for new lower neighbor
+            if(lower == null) {
+                log.info(() -> "Setting lower initially to --> " + joiningVal);
+                lower = joiningPeer;
+            } else {
+                long distanceToCurrentLower = calculateDistance(Long.parseLong(lower.getHexID(), 16), myVal); // counter clockwise check
+                long distanceToJoiningFromMyVal = calculateDistance(distanceToJoining, myVal);
+                if(distanceToJoiningFromMyVal < distanceToCurrentLower) {
+                    log.info(() -> "Updating lower neighbor to --> " + joiningPeer.getHexID());
+                    lower = joiningPeer;
+                }
             }
         }
     }
