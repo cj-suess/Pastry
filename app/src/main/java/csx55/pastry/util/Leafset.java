@@ -52,7 +52,7 @@ public class Leafset {
                 lower = joiningPeer;
             } else {
                 long distanceToCurrentLower = calculateDistance(Long.parseLong(lower.getHexID(), 16), myVal); // counter clockwise check
-                long distanceToJoiningFromMyVal = calculateDistance(distanceToJoining, myVal);
+                long distanceToJoiningFromMyVal = calculateDistance(joiningVal, myVal);
                 if(distanceToJoiningFromMyVal < distanceToCurrentLower) {
                     log.info(() -> "Updating lower neighbor to --> " + joiningPeer.getHexID());
                     lower = joiningPeer;
