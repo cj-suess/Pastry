@@ -333,19 +333,10 @@ public class Peer implements Node {
     }
 
     private void startNode() {
-        try {
-            ServerSocket serverSocket = new ServerSocket(0);
+        try(ServerSocket serverSocket = new ServerSocket(0);) {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
-            // Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            //     try {
-            //         deregister();
-            //         serverSocket.close();
-            //     } catch(IOException e) {
-            //         warning.accept(e);
-            //     }
-            // }));
             while(running) {
                 Socket clientSocket = serverSocket.accept();
                 log.info(() -> "New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
@@ -438,7 +429,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.WARNING);
+        LogConfig.init(Level.INFO);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
