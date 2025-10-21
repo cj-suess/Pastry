@@ -81,8 +81,8 @@ public class Peer implements Node {
             changed = updateTables(newNeighbor);
         }
         if(changed) {
-            log.info(() -> "My leafset changed. Updating peers in my leafset...");
-            updateLeafset(newNeighbor);
+            log.info(() -> "I have changes. Updating peers...");
+            updateAllPeers();
         }
     }
 
@@ -338,14 +338,14 @@ public class Peer implements Node {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    deregister();
-                    serverSocket.close();
-                } catch(IOException e) {
-                    warning.accept(e);
-                }
-            }));
+            // Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            //     try {
+            //         deregister();
+            //         serverSocket.close();
+            //     } catch(IOException e) {
+            //         warning.accept(e);
+            //     }
+            // }));
             while(running) {
                 Socket clientSocket = serverSocket.accept();
                 log.info(() -> "New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
@@ -438,7 +438,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
