@@ -39,6 +39,8 @@ public class EventFactory {
                     return readJoinResponse(messageType, dis);
                 case Protocol.UPDATE:
                     return readUpdateMessage(messageType, dis);
+                case Protocol.EXIT:
+                    return readExitMessage(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -48,6 +50,12 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private Exit readExitMessage(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo exitingPeer = readPeerInfo(dis);
+        PeerInfo newNeighbor = readPeerInfo(dis);
+        return new Exit(messageType, exitingPeer, newNeighbor);
     }
 
     private Update readUpdateMessage(int messageType, DataInputStream dis) throws IOException {

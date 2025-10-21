@@ -65,8 +65,30 @@ public class Peer implements Node {
             Protocol.ENTRY_NODE, this::processEntryNode,
             Protocol.JOIN_REQUEST, this::processJoinRequest,
             Protocol.JOIN_RESPONSE, this::processJoinResponse, 
-            Protocol.UPDATE, this::processUpdate
+            Protocol.UPDATE, this::processUpdate,
+            Protocol.EXIT, this::processExit
         );
+    }
+
+    private void processExit(Event event, Socket socket) {
+        Exit exitMessage = (Exit) event;
+        PeerInfo exitingPeer = exitMessage.getExitingPeer();
+        PeerInfo newNeighbor =  exitMessage.getNewNeighbor();
+        boolean changed = false;
+        if(exitingPeer.equals(ls.getlower())){
+            log.info(() -> "Replacing lower neighbor with --> " + newNeighbor.getHexID());
+            ls.setLower(newNeighbor);
+            changed = true;
+        } else if(exitingPeer.equals(ls.getHigher())){
+            log.info(() -> "Replacing higher neighbor with --> " + newNeighbor.getHexID());
+            ls.setHigher(newNeighbor);
+            changed = true;
+        }
+        updateTables(newNeighbor);
+        if(changed) {
+            log.info(() -> "My leafset changed. Updating peers in my leafset...");
+            updateLeafset(newNeighbor);
+        }
     }
 
     private void processUpdate(Event event, Socket socket) {
@@ -357,8 +379,38 @@ public class Peer implements Node {
         }
     }
 
+    private void exit() {
+        deregister();
+        PeerInfo lower = ls.getlower();
+        PeerInfo higher = ls.getHigher();
+        if(lower != null) {
+            sendExitMessage(lower, myPeerInfo, higher);
+        }
+        if(higher != null) {
+            sendExitMessage(higher, myPeerInfo, lower);
+        }
+    }
+
+    private void sendExitMessage(PeerInfo updatePeer, PeerInfo exitingPeer, PeerInfo newNeighbor) {
+        log.info(() -> "Sending exit message to --> " + updatePeer.getHexID());
+        Exit exitMessage = new Exit(Protocol.EXIT, exitingPeer, newNeighbor);
+        try {
+            TCPConnection conn = peerToConn.get(updatePeer);
+            if(conn == null) {
+                Socket socket = new Socket(updatePeer.getIP(), updatePeer.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                socketToConn.put(socket, conn);
+                peerToConn.put(updatePeer, conn);
+            }
+            conn.sender.sendData(exitMessage.getBytes());
+        } catch(IOException e) {
+            warning.accept(e);
+        }
+    }
+
     private void startCommands() {
-        commands.put("exit", this::deregister);
+        commands.put("exit", this::exit);
         commands.put("id", this::printId);
         commands.put("leaf-set", this::printLeafset);
         commands.put("routing-table", this::printRoutingTable);

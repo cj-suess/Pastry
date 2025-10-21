@@ -10,4 +10,5 @@ public interface Protocol {
     int JOIN_RESPONSE = 7;
     int NODE_ID = 8;
     int UPDATE = 9;
+    int EXIT = 10;
 }
