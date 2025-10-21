@@ -337,6 +337,7 @@ public class Peer implements Node {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
+
             while(running) {
                 Socket clientSocket = serverSocket.accept();
                 log.info(() -> "New connection from: " + clientSocket.getInetAddress().getHostAddress() + ":" + clientSocket.getPort());
