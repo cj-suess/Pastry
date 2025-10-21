@@ -389,6 +389,12 @@ public class Peer implements Node {
         if(higher != null) {
             sendExitMessage(higher, myPeerInfo, lower);
         }
+        try {
+            Thread.sleep(500);
+        } catch(InterruptedException e) {
+            warning.accept(e);
+        }
+        System.exit(0);
     }
 
     private void sendExitMessage(PeerInfo updatePeer, PeerInfo exitingPeer, PeerInfo newNeighbor) {
