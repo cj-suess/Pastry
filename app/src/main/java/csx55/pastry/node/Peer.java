@@ -67,11 +67,27 @@ public class Peer implements Node {
 
     private void processUpdate(Event event, Socket socket) {
         Update update = (Update) event;
-        PeerInfo peerInfo = update.getMyPeerInfo();
-        log.info(() -> "Received update message from --> " + peerInfo.toString());
-        updateTables(peerInfo);
+        PeerInfo sender = update.getMyPeerInfo();
+        log.info(() -> "Received update message from --> " + sender.toString());
+        boolean changed = updateTables(sender); // check if a change occurred
+
         for(PeerInfo p : update.getPeers()) {
             updateTables(p);
+        }
+
+        if(changed) { // update peers in leafset if something changed in my leafset
+            log.info(() -> "My leafset changed. Updating peers in my leafset...");
+            updateLeafset(sender);
+        }
+    }
+
+    private void updateLeafset(PeerInfo sender){
+        List<PeerInfo> peers = ls.getAllPeers();
+        for(PeerInfo p : peers) {
+            if(!p.equals(sender)) {
+                log.info(() -> "Updating --> " + p.getHexID());
+                sendUpdateMessage(p, peers);
+            }
         }
     }
 
@@ -90,10 +106,10 @@ public class Peer implements Node {
             updateTables(p);
         }
 
-        updatePeers(); // update all nodes in LS and RT
+        updateAllPeers(); // update all nodes in LS and RT
     }
 
-    private void updatePeers() {
+    private void updateAllPeers() {
         List<PeerInfo> peers = rt.getAllPeers();
         peers.addAll(ls.getAllPeers());
         for(PeerInfo p : peers) {
@@ -119,11 +135,14 @@ public class Peer implements Node {
         }
     }
 
-    private void updateTables(PeerInfo joiningPeerInfo) {
+    private boolean updateTables(PeerInfo joiningPeerInfo) {
+        boolean changed = false;
         if(joiningPeerInfo.getHexID().equals(myHexID)) { // dont' add myself
-            return;
+            return changed;
         }
-        ls.addPeer(joiningPeerInfo, myHexID); // add to ls (will only add if it is able to update one of my current neighbors)
+        if(ls.addPeer(joiningPeerInfo, myHexID)) { // add to ls (will only add if it is able to update one of my current neighbors)
+            changed = true;
+        }
         // now update routing table with any peer that I can use
         int row = longestMatchingPrefixLength(myHexID, joiningPeerInfo.getHexID());
         if(row < 4) { // don't add myself
@@ -132,6 +151,7 @@ public class Peer implements Node {
                 rt.setPeerInfo(row, col, joiningPeerInfo);
             }
         }
+        return changed;
     }
 
     private void processJoinRequest(Event event, Socket socket) {
