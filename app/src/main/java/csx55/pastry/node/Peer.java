@@ -84,6 +84,7 @@ public class Peer implements Node {
             ls.setHigher(newNeighbor);
             changed = true;
         }
+        rt.remove(exitingPeer);
         updateTables(newNeighbor);
         if(changed) {
             log.info(() -> "My leafset changed. Updating peers in my leafset...");

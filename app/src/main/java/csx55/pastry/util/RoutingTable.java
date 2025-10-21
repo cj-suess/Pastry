@@ -49,20 +49,12 @@ public class RoutingTable {
         return sb.toString();
     }
 
-    // public String printRoutingTable() {
-    //     StringBuilder sb = new StringBuilder();
-    //     for(int i = 0; i < 4; i++) {
-    //         String prefix = myHexId.substring(0,i);
-    //         for(int j = 0; j < 16; j++) {
-    //             if(rt[i][j] != null) {
-    //                 sb.append(prefix + Integer.toHexString(j) + "-" + rt[i][j].getIP() + ":" + rt[i][j].getPort() + ",");
-    //             } else {
-    //                 sb.append(prefix + Integer.toHexString(j) + "-:,");
-    //             }
-    //         }
-    //         sb.append("\n");
-    //     }
-    //     return sb.toString();
-    // }
+    public void remove(PeerInfo p) {
+        for(int i = 0; i < 4; i++) {
+            for(int j = 0; j < 16; j++) {
+                if(rt[i][j] != null && rt[i][j].equals(p)) { rt[i][j] = null; }
+            }
+        }
+    }
 
 }
