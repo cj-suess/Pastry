@@ -98,19 +98,19 @@ public class Peer implements Node {
 
         if(changed) { // update peers in leafset if something changed in my leafset
             log.info(() -> "My leafset changed. Updating peers in my leafset...");
-            updateLeafset(sender);
+            updateAllPeers();
         }
     }
 
-    private void updateLeafset(PeerInfo sender){
-        List<PeerInfo> peers = ls.getAllPeers();
-        for(PeerInfo p : peers) {
-            if(!p.equals(sender)) {
-                log.info(() -> "Updating --> " + p.getHexID());
-                sendUpdateMessage(p, peers);
-            }
-        }
-    }
+    // private void updateLeafset(PeerInfo sender){
+    //     List<PeerInfo> peers = ls.getAllPeers();
+    //     for(PeerInfo p : peers) {
+    //         if(!p.equals(sender)) {
+    //             log.info(() -> "Updating --> " + p.getHexID());
+    //             sendUpdateMessage(p, peers);
+    //         }
+    //     }
+    // }
 
     private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
@@ -430,7 +430,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
