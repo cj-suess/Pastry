@@ -22,8 +22,8 @@ public class Peer implements Node {
 
     private String myHexID;
     public PeerInfo myPeerInfo;
-    Leafset ls = new Leafset();
-    RoutingTable rt = new RoutingTable();
+    Leafset ls;
+    RoutingTable rt;
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private Map<PeerInfo, TCPConnection> peerToConn = new ConcurrentHashMap<>();
@@ -34,6 +34,8 @@ public class Peer implements Node {
     public Peer(String host, int port, String hexID) {
         regNodeInfo = new ConnInfo(host, port);
         this.myHexID = hexID;
+        ls = new Leafset();
+        rt = new RoutingTable(myHexID);
         startsEvents();
         startCommands();
     }
@@ -41,6 +43,8 @@ public class Peer implements Node {
     public Peer(String host, int port){
         regNodeInfo = new ConnInfo(host, port);
         this.myHexID = String.format("%04X", ThreadLocalRandom.current().nextInt(65536));
+        ls = new Leafset();
+        rt = new RoutingTable(myHexID);
         startsEvents();
         startCommands();
     }
@@ -368,11 +372,11 @@ public class Peer implements Node {
     }
 
     private void printRoutingTable() {
-        System.out.println(rt.toString());
+        System.out.println(rt);
     }
 
     private void printLeafset(){
-        System.out.print(ls.toString());
+        System.out.print(ls);
     }
 
     private void printId(){
