@@ -74,18 +74,12 @@ public class Peer implements Node {
         Exit exitMessage = (Exit) event;
         PeerInfo exitingPeer = exitMessage.getExitingPeer();
         PeerInfo newNeighbor =  exitMessage.getNewNeighbor();
-        boolean changed = false;
-        if(exitingPeer.equals(ls.getlower())){
-            log.info(() -> "Replacing lower neighbor with --> " + newNeighbor.getHexID());
-            ls.setLower(newNeighbor);
-            changed = true;
-        } else if(exitingPeer.equals(ls.getHigher())){
-            log.info(() -> "Replacing higher neighbor with --> " + newNeighbor.getHexID());
-            ls.setHigher(newNeighbor);
-            changed = true;
-        }
+        ls.remove(exitingPeer);
         rt.remove(exitingPeer);
-        updateTables(newNeighbor);
+        boolean changed = false;
+        if(newNeighbor != null){
+            changed = updateTables(newNeighbor);
+        }
         if(changed) {
             log.info(() -> "My leafset changed. Updating peers in my leafset...");
             updateLeafset(newNeighbor);
