@@ -13,4 +13,5 @@ public interface Protocol {
     int EXIT = 10;
     int REFERENCE = 11;
     int REFERENCE_NOTIFICATION = 12;
+    int HANDSHAKE = 13;
 }
