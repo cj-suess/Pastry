@@ -74,11 +74,11 @@ public class Peer implements Node {
         Exit exitMessage = (Exit) event;
         PeerInfo exitingPeer = exitMessage.getExitingPeer();
         PeerInfo newNeighbor =  exitMessage.getNewNeighbor();
-        ls.remove(exitingPeer);
         rt.remove(exitingPeer);
+        ls.remove(exitingPeer);
         boolean changed = false;
-        if(newNeighbor != null){
-            changed = updateTables(newNeighbor);
+        if(newNeighbor != null) {
+            changed = ls.addPeer(newNeighbor, myHexID);
         }
         if(changed) {
             log.info(() -> "I have changes. Updating peers...");
@@ -98,19 +98,19 @@ public class Peer implements Node {
 
         if(changed) { // update peers in leafset if something changed in my leafset
             log.info(() -> "My leafset changed. Updating peers in my leafset...");
-            updateAllPeers();
+            updateLeafset(sender);
         }
     }
 
-    // private void updateLeafset(PeerInfo sender){
-    //     List<PeerInfo> peers = ls.getAllPeers();
-    //     for(PeerInfo p : peers) {
-    //         if(!p.equals(sender)) {
-    //             log.info(() -> "Updating --> " + p.getHexID());
-    //             sendUpdateMessage(p, peers);
-    //         }
-    //     }
-    // }
+    private void updateLeafset(PeerInfo sender){
+        List<PeerInfo> peers = ls.getAllPeers();
+        for(PeerInfo p : peers) {
+            if(!p.equals(sender)) {
+                log.info(() -> "Updating --> " + p.getHexID());
+                sendUpdateMessage(p, peers);
+            }
+        }
+    }
 
     private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
@@ -254,7 +254,7 @@ public class Peer implements Node {
         allPeers.addAll(ls.getAllPeers());
         for(PeerInfo peer : allPeers) {
             long currPeerVal = Long.parseLong(peer.getHexID(), 16);
-            long distance = Math.abs(joiningNodeVal - currPeerVal);
+            long distance = ls.calculateMinDistance(joiningNodeVal, currPeerVal);
             if(distance < minDistance){
                 minDistance = distance;
                 closestOverallPeer = peer;
@@ -271,7 +271,7 @@ public class Peer implements Node {
     }
 
     private boolean isCloser(String joiningHexId, String closestPeerHexId, String myHexId) {
-        return Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(closestPeerHexId, 16)) < Math.abs(Long.parseLong(joiningHexId, 16) - Long.parseLong(myHexId, 16));
+        return ls.calculateMinDistance(Long.parseLong(joiningHexId, 16), Long.parseLong(closestPeerHexId, 16)) < ls.calculateMinDistance(Long.parseLong(joiningHexId, 16), Long.parseLong(myHexId, 16));
     }
 
     private void processEntryNode(Event event, Socket socket) {
@@ -368,7 +368,7 @@ public class Peer implements Node {
 
     private void exit() {
         deregister();
-        PeerInfo lower = ls.getlower();
+        PeerInfo lower = ls.getLower();
         PeerInfo higher = ls.getHigher();
         if(lower != null) {
             sendExitMessage(lower, myPeerInfo, higher);
@@ -430,7 +430,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.WARNING);
+        LogConfig.init(Level.INFO);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
