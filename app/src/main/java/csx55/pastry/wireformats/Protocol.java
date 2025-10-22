@@ -11,4 +11,6 @@ public interface Protocol {
     int NODE_ID = 8;
     int UPDATE = 9;
     int EXIT = 10;
+    int REFERENCE = 11;
+    int REFERENCE_NOTIFICATION = 12;
 }
