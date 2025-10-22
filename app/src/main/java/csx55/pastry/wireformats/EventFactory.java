@@ -41,6 +41,10 @@ public class EventFactory {
                     return readUpdateMessage(messageType, dis);
                 case Protocol.EXIT:
                     return readExitMessage(messageType, dis);
+                case Protocol.REFERENCE:
+                    return readReferenceMessage(messageType, dis);
+                case Protocol.REFERENCE_NOTIFICATION:
+                    return readReferenceRemoval(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -50,6 +54,14 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private Register readReferenceRemoval(int messageType, DataInputStream dis) throws IOException {
+        return new Register(Protocol.REFERENCE_NOTIFICATION, readPeerInfo(dis));
+    }
+
+    private Register readReferenceMessage(int messageType, DataInputStream dis) throws IOException {
+        return new Register(Protocol.REFERENCE, readPeerInfo(dis));
     }
 
     private Exit readExitMessage(int messageType, DataInputStream dis) throws IOException {
