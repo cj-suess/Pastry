@@ -435,8 +435,8 @@ public class Peer implements Node {
     }
 
     private void printConnections() {
-        for(Map.Entry<String, TCPConnection> conn : peerToConn.entrySet()) {
-            log.info(() -> conn.getKey().toString());
+        for(String conn : peerToConn.keySet()) {
+            log.info(() -> conn);
         }
     }
 
