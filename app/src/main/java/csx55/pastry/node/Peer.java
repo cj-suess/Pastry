@@ -84,7 +84,9 @@ public class Peer implements Node {
 
     private void processReference(Event event, Socket socket) {
         Register referenceMessage = (Register) event;
-        references.add(referenceMessage.peerInfo);
+        synchronized(lock) {
+            references.add(referenceMessage.peerInfo);
+        }
     }
 
     private void processExit(Event event, Socket socket) {
