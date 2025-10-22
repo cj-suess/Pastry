@@ -401,7 +401,7 @@ public class Peer implements Node {
             sendExitMessage(higher, myPeerInfo, lower);
         }
         try {
-            Thread.sleep(500);
+            Thread.sleep(100);
         } catch(InterruptedException e) {
             warning.accept(e);
         }
