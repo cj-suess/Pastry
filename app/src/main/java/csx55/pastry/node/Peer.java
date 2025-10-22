@@ -428,14 +428,14 @@ public class Peer implements Node {
         synchronized(lock) {
             lower = ls.getLower();
             higher = ls.getHigher();
+            if(lower != null) {
+                sendExitMessage(lower, myPeerInfo, higher);
+            }
+            if(higher != null) {
+                sendExitMessage(higher, myPeerInfo, lower);
+            }
+            notifyReferences();
         }
-        if(lower != null) {
-            sendExitMessage(lower, myPeerInfo, higher);
-        }
-        if(higher != null) {
-            sendExitMessage(higher, myPeerInfo, lower);
-        }
-        notifyReferences();
         try {
             Thread.sleep(100);
         } catch(InterruptedException e) {
