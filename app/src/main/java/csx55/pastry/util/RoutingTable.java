@@ -49,12 +49,16 @@ public class RoutingTable {
         return sb.toString();
     }
 
-    public void remove(PeerInfo p) {
+    public boolean remove(PeerInfo p) {
         for(int i = 0; i < 4; i++) {
             for(int j = 0; j < 16; j++) {
-                if(rt[i][j] != null && rt[i][j].equals(p)) { rt[i][j] = null; }
+                if(rt[i][j] != null && rt[i][j].equals(p)) { 
+                    rt[i][j] = null; 
+                    return true;
+                }
             }
         }
+        return false;
     }
 
 }

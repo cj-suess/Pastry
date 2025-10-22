@@ -16,6 +16,8 @@ public class Peer implements Node {
     private Logger log = Logger.getLogger(this.getClass().getName());
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
+    private final Object lock = new Object();
+
     private boolean running = true;
     private ConnInfo regNodeInfo;
     private TCPConnection regConn;
@@ -26,7 +28,7 @@ public class Peer implements Node {
     RoutingTable rt;
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
-    private Map<PeerInfo, TCPConnection> peerToConn = new ConcurrentHashMap<>();
+    private Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private Map<String, Runnable> commands = new HashMap<>();
@@ -74,13 +76,13 @@ public class Peer implements Node {
         Exit exitMessage = (Exit) event;
         PeerInfo exitingPeer = exitMessage.getExitingPeer();
         PeerInfo newNeighbor =  exitMessage.getNewNeighbor();
-        rt.remove(exitingPeer);
-        ls.remove(exitingPeer);
-        boolean changed = false;
-        if(newNeighbor != null) {
+        boolean removed;
+        boolean changed;
+        synchronized(lock) {
+            removed = rt.remove(exitingPeer) | ls.remove(exitingPeer);
             changed = ls.addPeer(newNeighbor, myHexID);
         }
-        if(changed) {
+        if(changed || removed) {
             log.info(() -> "I have changes. Updating peers...");
             updateAllPeers();
         }
@@ -90,10 +92,13 @@ public class Peer implements Node {
         Update update = (Update) event;
         PeerInfo sender = update.getMyPeerInfo();
         log.info(() -> "Received update message from --> " + sender.toString());
-        boolean changed = updateTables(sender); // check if a change occurred
+        boolean changed;
 
-        for(PeerInfo p : update.getPeers()) {
-            updateTables(p);
+        synchronized(lock){
+            changed = updateTables(sender);
+            for(PeerInfo p : update.getPeers()) {
+                updateTables(p);
+            }
         }
 
         if(changed) { // update peers in leafset if something changed in my leafset
@@ -103,7 +108,10 @@ public class Peer implements Node {
     }
 
     private void updateLeafset(PeerInfo sender){
-        List<PeerInfo> peers = ls.getAllPeers();
+        List<PeerInfo> peers;
+        synchronized(lock) {
+            peers = new ArrayList<>(ls.getAllPeers());
+        }
         for(PeerInfo p : peers) {
             if(!p.equals(sender)) {
                 log.info(() -> "Updating --> " + p.getHexID());
@@ -117,22 +125,27 @@ public class Peer implements Node {
         PeerInfo joiningPeerInfo = joinResponse.getPeerInfo();
         log.info(() -> "Received join response from --> " + joiningPeerInfo.toString());
         
-        updateTables(joiningPeerInfo); // update LS with joining peer
+        synchronized(lock) {
+            updateTables(joiningPeerInfo); // update LS with joining peer
 
-        for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's LS
-            updateTables(p);
-        }
+            for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's LS
+                updateTables(p);
+            }
 
-        for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's RT
-            updateTables(p);
+            for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's RT
+                updateTables(p);
+            }
         }
 
         updateAllPeers(); // update all nodes in LS and RT
     }
 
     private void updateAllPeers() {
-        List<PeerInfo> peers = rt.getAllPeers();
-        peers.addAll(ls.getAllPeers());
+        List<PeerInfo> peers;
+        synchronized(lock) {
+            peers = new ArrayList<>(rt.getAllPeers());
+            peers.addAll(ls.getAllPeers());
+        }
         for(PeerInfo p : peers) {
             log.info(() -> "Sending update message to --> " + p.getHexID());
             sendUpdateMessage(p, peers);
@@ -142,13 +155,13 @@ public class Peer implements Node {
     private void sendUpdateMessage(PeerInfo p, List<PeerInfo> peers) {
         Update update = new Update(Protocol.UPDATE, myPeerInfo, peers);
         try {
-            TCPConnection conn = peerToConn.get(p);
+            TCPConnection conn = peerToConn.get(p.getHexID());
             if(conn == null){
                 Socket socket = new Socket(p.getIP(), p.getPort());
                 conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
-                peerToConn.put(p, conn);
+                peerToConn.put(p.getHexID(), conn);
             }
             conn.sender.sendData(update.getBytes());
         } catch(IOException e) {
@@ -205,24 +218,28 @@ public class Peer implements Node {
         }
         // I am the closest peer to the joining peer
         log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
-        updateTables(joiningPeerInfo);
-        sendJoinResponse(joiningPeerInfo, myHexID, ls, rt);
+        List<PeerInfo> lsCopy;
+        List<PeerInfo> rtCopy;
+        synchronized(lock) {
+            updateTables(joiningPeerInfo);
+            lsCopy = new ArrayList<>(ls.getAllPeers());
+            rtCopy = new ArrayList<>(rt.getAllPeers()); 
+        }
+        sendJoinResponse(joiningPeerInfo, myHexID, lsCopy, rtCopy);
     }
 
-    private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, Leafset ls, RoutingTable rt) {
-        List<PeerInfo> leafsetList = ls.getAllPeers();
-        leafsetList.remove(joinPeerInfo);
-        List<PeerInfo> rtList = rt.getAllPeers();
-        rtList.remove(joinPeerInfo);
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, leafsetList, rtList);
+    private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, List<PeerInfo> ls, List<PeerInfo> rt) {
+        ls.remove(joinPeerInfo);
+        rt.remove(joinPeerInfo);
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
         try {
-            TCPConnection conn = peerToConn.get(joinPeerInfo);
+            TCPConnection conn = peerToConn.get(joinPeerInfo.getHexID());
             if(conn == null){
                 Socket socket = new Socket(joinPeerInfo.getIP(), joinPeerInfo.getPort());
                 conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
-                peerToConn.put(joinPeerInfo, conn);
+                peerToConn.put(joinPeerInfo.getHexID(), conn);
             }
             conn.sender.sendData(joinResponse.getBytes());
         } catch(IOException e) {
@@ -232,13 +249,13 @@ public class Peer implements Node {
 
     private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
         try {
-            TCPConnection conn = peerToConn.get(peerInfo);
+            TCPConnection conn = peerToConn.get(peerInfo.getHexID());
             if(conn == null){
                 Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
                 conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
-                peerToConn.put(peerInfo, conn);
+                peerToConn.put(peerInfo.getHexID(), conn);
             }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
@@ -250,8 +267,11 @@ public class Peer implements Node {
         PeerInfo closestOverallPeer = null;
         long minDistance = Long.MAX_VALUE;
         long joiningNodeVal = Long.parseLong(joiningNodeHexId, 16);
-        List<PeerInfo> allPeers = rt.getAllPeers();
-        allPeers.addAll(ls.getAllPeers());
+        List<PeerInfo> allPeers;
+        synchronized(lock) {
+            allPeers = new ArrayList<>(rt.getAllPeers());
+            allPeers.addAll(ls.getAllPeers());
+        }
         for(PeerInfo peer : allPeers) {
             long currPeerVal = Long.parseLong(peer.getHexID(), 16);
             long distance = ls.calculateMinDistance(joiningNodeVal, currPeerVal);
@@ -284,13 +304,13 @@ public class Peer implements Node {
     private void sendJoinRequest(PeerInfo entryNode) {
         JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
         try {
-            TCPConnection conn = peerToConn.get(entryNode);
+            TCPConnection conn = peerToConn.get(entryNode.getHexID());
             if(conn == null) {
                 Socket socket = new Socket(entryNode.getIP(), entryNode.getPort());
                 conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
-                peerToConn.put(entryNode, conn);
+                peerToConn.put(entryNode.getHexID(), conn);
             }
             conn.sender.sendData(joinRequest.getBytes());
         } catch(IOException e) {
@@ -368,8 +388,12 @@ public class Peer implements Node {
 
     private void exit() {
         deregister();
-        PeerInfo lower = ls.getLower();
-        PeerInfo higher = ls.getHigher();
+        PeerInfo lower;
+        PeerInfo higher;
+        synchronized(lock) {
+            lower = ls.getLower();
+            higher = ls.getHigher();
+        }
         if(lower != null) {
             sendExitMessage(lower, myPeerInfo, higher);
         }
@@ -388,13 +412,13 @@ public class Peer implements Node {
         log.info(() -> "Sending exit message to --> " + updatePeer.getHexID());
         Exit exitMessage = new Exit(Protocol.EXIT, exitingPeer, newNeighbor);
         try {
-            TCPConnection conn = peerToConn.get(updatePeer);
+            TCPConnection conn = peerToConn.get(updatePeer.getHexID());
             if(conn == null) {
                 Socket socket = new Socket(updatePeer.getIP(), updatePeer.getPort());
                 conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
                 socketToConn.put(socket, conn);
-                peerToConn.put(updatePeer, conn);
+                peerToConn.put(updatePeer.getHexID(), conn);
             }
             conn.sender.sendData(exitMessage.getBytes());
         } catch(IOException e) {
@@ -411,7 +435,7 @@ public class Peer implements Node {
     }
 
     private void printConnections() {
-        for(Map.Entry<PeerInfo, TCPConnection> conn : peerToConn.entrySet()) {
+        for(Map.Entry<String, TCPConnection> conn : peerToConn.entrySet()) {
             log.info(() -> conn.getKey().toString());
         }
     }

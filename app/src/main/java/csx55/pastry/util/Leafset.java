@@ -13,9 +13,16 @@ public class Leafset {
     private PeerInfo higher;
     private final long MAX_ID = 65536;
 
-    public void remove(PeerInfo peer){
-        if(peer != null && peer.equals(lower)) { lower = null; }
-        if(peer != null && peer.equals(higher)){ higher = null; }
+    public boolean remove(PeerInfo peer){
+        if(peer != null && peer.equals(lower)) { 
+            lower = null; 
+            return true;
+        }
+        if(peer != null && peer.equals(higher)){ 
+            higher = null; 
+            return true;
+        }
+        return false;
     }
 
     private long clockwise(long x, long y) { // calculate the clockwise distance between two peers

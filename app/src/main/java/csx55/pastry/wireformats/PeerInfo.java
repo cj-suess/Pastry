@@ -14,7 +14,7 @@ public class PeerInfo implements Comparable<PeerInfo> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(hexID, conn);
+        return Objects.hash(hexID);
     }
 
     @Override
@@ -27,7 +27,7 @@ public class PeerInfo implements Comparable<PeerInfo> {
         if (this == o) return true;
         if (o == null || !(o instanceof PeerInfo)) return false;
         PeerInfo peerInfo = (PeerInfo) o;
-        return Objects.equals(hexID, peerInfo.hexID) && Objects.equals(conn, peerInfo.conn);
+        return Objects.equals(hexID, peerInfo.hexID);
     }
 
     @Override
