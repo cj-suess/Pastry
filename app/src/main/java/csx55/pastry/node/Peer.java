@@ -56,7 +56,7 @@ public class Peer implements Node {
     @Override
     public void onEvent(Event event, Socket socket) {
         if(event != null) {
-            BiConsumer<Event, Socket> handler = events.get(event.getType());
+            BiConsumer<Event, Socket> handler = events.get(event.getType()); 
             if(handler != null) {
                 handler.accept(event, socket);
             }

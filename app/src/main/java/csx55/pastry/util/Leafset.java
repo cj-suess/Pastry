@@ -135,10 +135,10 @@ public class Leafset {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         if(lower != null){
-            sb.append(lower.toString() + "\n");
+            sb.append("Lower: " + lower.toString() + "\n");
         }
         if(higher != null) {
-            sb.append(higher.toString() + "\n");
+            sb.append("Higher: " + higher.toString() + "\n");
         }
         return sb.toString();
     }
