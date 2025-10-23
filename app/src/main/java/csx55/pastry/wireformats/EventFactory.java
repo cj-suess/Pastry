@@ -45,6 +45,8 @@ public class EventFactory {
                     return readReferenceMessage(messageType, dis);
                 case Protocol.REFERENCE_NOTIFICATION:
                     return readReferenceRemoval(messageType, dis);
+                case Protocol.HANDSHAKE:
+                    return readHandshake(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -56,12 +58,16 @@ public class EventFactory {
         return null;
     }
 
+    private Register readHandshake(int messageType, DataInputStream dis) throws IOException {
+        return new Register(messageType, readPeerInfo(dis));
+    }
+
     private Register readReferenceRemoval(int messageType, DataInputStream dis) throws IOException {
-        return new Register(Protocol.REFERENCE_NOTIFICATION, readPeerInfo(dis));
+        return new Register(messageType, readPeerInfo(dis));
     }
 
     private Register readReferenceMessage(int messageType, DataInputStream dis) throws IOException {
-        return new Register(Protocol.REFERENCE, readPeerInfo(dis));
+        return new Register(messageType, readPeerInfo(dis));
     }
 
     private Exit readExitMessage(int messageType, DataInputStream dis) throws IOException {
