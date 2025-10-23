@@ -29,7 +29,7 @@ public class Peer implements Node {
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
-    private Set<PeerInfo> references = new HashSet<>();
+    private Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private Map<String, Runnable> commands = new HashMap<>();
@@ -57,7 +57,9 @@ public class Peer implements Node {
     public void onEvent(Event event, Socket socket) {
         if(event != null) {
             BiConsumer<Event, Socket> handler = events.get(event.getType());
-            handler.accept(event, socket);
+            if(handler != null) {
+                handler.accept(event, socket);
+            }
         }
     }
 
@@ -85,27 +87,28 @@ public class Peer implements Node {
         }
     }
 
-    private TCPConnection getConnection(PeerInfo peerInfo) throws IOException {
+    private TCPConnection getConnection(PeerInfo peerInfo) {
         String peerHexId = peerInfo.getHexID();
-        try {
-            return peerToConn.computeIfAbsent(peerHexId, hexId -> {
-                try{
-                    log.info(() -> "Adding new connection to --> " + peerHexId);
-                    Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
-                    TCPConnection conn = new TCPConnection(socket, this);
-                    conn.startReceiverThread();
+        TCPConnection conn;
+        synchronized(peerToConn) {
+            conn = peerToConn.get(peerHexId);
+            if(conn != null) { return conn; }
+            try{
+                Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                synchronized(peerToConn) {
                     socketToConn.put(socket, conn);
-
-                    Register handshakeMessage = new Register(Protocol.HANDSHAKE, myPeerInfo);
-                    conn.sender.sendData(handshakeMessage.getBytes());
-                    return conn;
-                } catch(IOException e) {
-                    throw new UncheckedIOException(e);
+                    peerToConn.put(peerHexId, conn);
                 }
-            }); 
-        } catch(UncheckedIOException e){
-            throw e.getCause();
+                Register handshake = new Register(Protocol.HANDSHAKE, myPeerInfo);
+                conn.sender.sendData(handshake.getBytes());
+                return conn;
+            }catch(IOException e) {
+                warning.accept(e);
+            }
         }
+        return null;
     }
 
     private void processReferenceRemoval(Event event, Socket socket) {
@@ -204,12 +207,7 @@ public class Peer implements Node {
 
     private void sendUpdateMessage(PeerInfo p, List<PeerInfo> peers) {
         Update update = new Update(Protocol.UPDATE, myPeerInfo, peers);
-        try {
-            TCPConnection conn = getConnection(p);
-            conn.sender.sendData(update.getBytes());
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        send(p, update);
     }
 
     private boolean updateTables(PeerInfo joiningPeerInfo) {
@@ -234,12 +232,7 @@ public class Peer implements Node {
 
     private void sendReferenceMessage(PeerInfo peerInfo){
         Register referenceMessage = new Register(Protocol.REFERENCE, myPeerInfo);
-        try {
-            TCPConnection conn = getConnection(peerInfo);
-            conn.sender.sendData(referenceMessage.getBytes());
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        send(peerInfo, referenceMessage);
     }
 
     private void processJoinRequest(Event event, Socket socket) {
@@ -286,21 +279,11 @@ public class Peer implements Node {
         ls.remove(joinPeerInfo);
         rt.remove(joinPeerInfo);
         JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
-        try {
-            TCPConnection conn = getConnection(joinPeerInfo);
-            conn.sender.sendData(joinResponse.getBytes());
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        send(joinPeerInfo, joinResponse);
     }
 
     private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
-        try {
-            TCPConnection conn = getConnection(peerInfo);
-            conn.sender.sendData(joinRequest.getBytes());
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        send(peerInfo, joinRequest);
     }
 
     private PeerInfo closestOverallPeer(String joiningNodeHexId) {
@@ -343,9 +326,13 @@ public class Peer implements Node {
 
     private void sendJoinRequest(PeerInfo entryNode) {
         JoinRequest joinRequest = new JoinRequest(Protocol.JOIN_REQUEST, myPeerInfo);
+        send(entryNode, joinRequest);
+    }
+
+    private void send(PeerInfo peerInfo, Event event) {
         try {
-            TCPConnection conn = getConnection(entryNode);
-            conn.sender.sendData(joinRequest.getBytes());
+            TCPConnection conn = getConnection(peerInfo);
+            conn.sender.sendData(event.getBytes());
         } catch(IOException e) {
             warning.accept(e);
         }
@@ -420,12 +407,11 @@ public class Peer implements Node {
     }
 
     private void exit() {
+        running = false;
         deregister();
-        PeerInfo lower;
-        PeerInfo higher;
         synchronized(lock) {
-            lower = ls.getLower();
-            higher = ls.getHigher();
+            PeerInfo lower = ls.getLower();
+            PeerInfo higher = ls.getHigher();
             if(lower != null) {
                 sendExitMessage(lower, myPeerInfo, higher);
             }
@@ -433,11 +419,14 @@ public class Peer implements Node {
                 sendExitMessage(higher, myPeerInfo, lower);
             }
             notifyReferences();
+            log.info(() -> "Exit complete...");
         }
-        try {
-            Thread.sleep(100);
-        } catch(InterruptedException e) {
-            warning.accept(e);
+        for(TCPConnection conn : peerToConn.values()){
+            try {
+                conn.socket.close();
+            } catch (IOException e) {
+                warning.accept(e);
+            }
         }
         System.exit(0);
     }
@@ -445,24 +434,14 @@ public class Peer implements Node {
     private void notifyReferences() {
         Register notifyReferencesMessage = new Register(Protocol.REFERENCE_NOTIFICATION, myPeerInfo);
         for(PeerInfo p : references) {
-            try {
-                TCPConnection conn = getConnection(p);
-                conn.sender.sendData(notifyReferencesMessage.getBytes());
-            } catch(IOException e) {
-                warning.accept(e);
-            }
+            send(p, notifyReferencesMessage);
         }
     }
 
     private void sendExitMessage(PeerInfo updatePeer, PeerInfo exitingPeer, PeerInfo newNeighbor) {
         log.info(() -> "Sending exit message to --> " + updatePeer.getHexID());
         Exit exitMessage = new Exit(Protocol.EXIT, exitingPeer, newNeighbor);
-        try {
-            TCPConnection conn = getConnection(updatePeer);
-            conn.sender.sendData(exitMessage.getBytes());
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        send(updatePeer, exitMessage);
     }
 
     private void startCommands() {
