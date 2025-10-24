@@ -7,6 +7,7 @@ import java.util.logging.*;
 
 public class Leafset {
 
+    @SuppressWarnings("unused")
     private Logger log = Logger.getLogger(this.getClass().getName());
 
     private PeerInfo lower;
@@ -25,61 +26,11 @@ public class Leafset {
         return false;
     }
 
-    private long clockwise(long x, long y) { // calculate the clockwise distance between two peers
-        return (y - x + MAX_ID) % MAX_ID; 
+    public long clockwise(long from, long to) { // just flip for ccw for simplicity
+        return (to - from + MAX_ID) % MAX_ID; 
     }
 
-    private long counterClockwise(long x, long y) {
-        return (x - y + MAX_ID) % MAX_ID;
-    }
- 
-    public boolean addPeer(PeerInfo joiningPeer, String myHexId) {
-        boolean changed = false;
-        if(joiningPeer == null) {
-            log.info("Could not add peer. Joining peer was null...");
-            return changed;
-        }
-        if(joiningPeer.getHexID().equals(myHexId)) {
-            log.info("Could not add peer. Joining peer hexID was my own...");
-            return changed;
-        }
-
-        long myVal = Long.parseLong(myHexId, 16);
-        long joiningVal = Long.parseLong(joiningPeer.getHexID(), 16);
-        long cw = clockwise(myVal, joiningVal);
-        long ccw = counterClockwise(myVal, joiningVal);
-
-        if(cw <= ccw) { // potentiall new higher neighbor
-            if(higher == null) {
-                log.info(() -> "Setting higher initially to --> " + joiningPeer.getHexID());
-                higher = joiningPeer;
-                changed = true;
-            } else {
-                long currentHigherCW = clockwise(myVal, Long.parseLong(higher.getHexID(), 16));
-                if(cw < currentHigherCW) {
-                    log.info(() -> "Updating higher neighbor to --> " + joiningPeer.getHexID());
-                    higher = joiningPeer;
-                    changed = true;
-                }
-            }
-        } else { // check for new lower neighbor
-            if(lower == null) {
-                log.info(() -> "Setting lower initially to --> " + joiningPeer.getHexID());
-                lower = joiningPeer;
-                changed = true;
-            } else {
-                long currLowerCCW = counterClockwise(myVal, Long.parseLong(lower.getHexID(), 16));
-                if(ccw < currLowerCCW) {
-                    log.info(() -> "Updating lower neighbor to --> " + joiningPeer.getHexID());
-                    lower = joiningPeer;
-                    changed = true;
-                }
-            }
-        }
-        return changed;
-    }
-
-    public long calculateMinDistance(long x, long y) {
+    public long calculateMinDistance(long x, long y) { // this will find the shortest numerical distance w/ wrap around
         long dist = Math.abs(x - y);
         return Math.min(dist, MAX_ID - dist);
     }
@@ -94,11 +45,7 @@ public class Leafset {
         long lowerVal = Long.parseLong(lower.getHexID(), 16);
         long higherVal = Long.parseLong(higher.getHexID(), 16);
 
-        if(calculateMinDistance(joiningVal, lowerVal) <= calculateMinDistance(joiningVal, higherVal)) {
-            return lower;
-        } else {
-            return higher;
-        }
+        return (calculateMinDistance(joiningVal, lowerVal) <= calculateMinDistance(joiningVal, higherVal)) ? lower : higher;
     }
 
     public List<PeerInfo> getAllPeers() {
@@ -124,11 +71,11 @@ public class Leafset {
     }
 
     public void setLower(PeerInfo newLower) {
-        this.lower = newLower;
+        if(newLower != null){ this.lower = newLower; }
     }
 
     public void setHigher(PeerInfo newHigher) {
-        this.higher = newHigher;
+        if(newHigher != null) { this.higher = newHigher; }
     }
 
     @Override

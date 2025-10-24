@@ -70,12 +70,25 @@ public class Peer implements Node {
             Protocol.ENTRY_NODE, this::processEntryNode,
             Protocol.JOIN_REQUEST, this::processJoinRequest,
             Protocol.JOIN_RESPONSE, this::processJoinResponse, 
-            Protocol.UPDATE, this::processUpdate,
+            Protocol.LEAFSET_UPDATE, this::processLeafsetUpdate,
             Protocol.EXIT, this::processExit,
             Protocol.REFERENCE, this::processReference,
             Protocol.REFERENCE_NOTIFICATION, this::processReferenceRemoval,
             Protocol.HANDSHAKE, this::processHandshake
         );
+    }
+
+    private void processLeafsetUpdate(Event event, Socket socket) {
+        LeafsetUpdate leafsetUpdate = (LeafsetUpdate) event;
+        PeerInfo sourcPeerInfo = leafsetUpdate.getPeerInfo();
+        int role = leafsetUpdate.getRole();
+
+        log.info(() -> "Received leafset update from --> " + sourcPeerInfo.getHexID());
+
+        synchronized(lock) {
+            if(role == LeafsetUpdate.LOWER) { ls.setLower(sourcPeerInfo); }
+            if(role == LeafsetUpdate.HIGHER) { ls.setHigher(sourcPeerInfo); }
+        }
     }
 
     private void processHandshake(Event event, Socket socket) {
@@ -129,105 +142,70 @@ public class Peer implements Node {
         Exit exitMessage = (Exit) event;
         PeerInfo exitingPeer = exitMessage.getExitingPeer();
         PeerInfo newNeighbor =  exitMessage.getNewNeighbor();
-        boolean removed;
-        boolean changed;
         synchronized(lock) {
-            removed = rt.remove(exitingPeer) | ls.remove(exitingPeer);
-            changed = ls.addPeer(newNeighbor, myHexID);
-        }
-        if(changed || removed) {
-            log.info(() -> "I have changes. Updating peers...");
-            updateAllPeers();
-        }
-    }
-
-    private void processUpdate(Event event, Socket socket) {
-        Update update = (Update) event;
-        PeerInfo sender = update.getMyPeerInfo();
-        log.info(() -> "Received update message from --> " + sender.toString());
-        boolean changed;
-
-        synchronized(lock){
-            changed = updateTables(sender);
-            for(PeerInfo p : update.getPeers()) {
-                updateTables(p);
-            }
-        }
-
-        if(changed) { // update peers in leafset if something changed in my leafset
-            log.info(() -> "My leafset changed. Updating peers in my leafset...");
-            updateLeafset(sender);
-        }
-    }
-
-    private void updateLeafset(PeerInfo sender){
-        List<PeerInfo> peers;
-        synchronized(lock) {
-            peers = new ArrayList<>(ls.getAllPeers());
-        }
-        for(PeerInfo p : peers) {
-            if(!p.equals(sender)) {
-                log.info(() -> "Updating --> " + p.getHexID());
-                sendUpdateMessage(p, peers);
-            }
+            rt.remove(exitingPeer);
+            ls.remove(exitingPeer);
+            if(exitMessage.getRole() == Exit.LOWER) { ls.setLower(newNeighbor); }
+            if(exitMessage.getRole() == Exit.HIGHER) { ls.setHigher(newNeighbor); }
         }
     }
 
     private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
-        PeerInfo joiningPeerInfo = joinResponse.getPeerInfo();
-        log.info(() -> "Received join response from --> " + joiningPeerInfo.toString());
+        PeerInfo respondPeerInfo = joinResponse.getRespondingPeer();
+        log.info(() -> "Received join response from --> " + respondPeerInfo.toString());
         
         synchronized(lock) {
-            updateTables(joiningPeerInfo); // update LS with joining peer
+            for(PeerInfo p : joinResponse.getRoutingTable()) {
+                if(!p.getHexID().equals(myHexID)) {
+                    int row = longestMatchingPrefixLength(myHexID, p.getHexID());
+                    int col = Character.digit(p.getHexID().charAt(row), 16);
+                    if(rt.addPeer(p, row, col)) { sendReferenceMessage(p); }
+                }
+            }
+            int row = longestMatchingPrefixLength(myHexID, respondPeerInfo.getHexID());
+            int col = Character.digit(respondPeerInfo.getHexID().charAt(row), 16);
+            if(rt.addPeer(respondPeerInfo, row, col)) { sendReferenceMessage(respondPeerInfo); }
 
-            for(PeerInfo p : joinResponse.getLeafset()) { // make updates with joining peer's LS
-                updateTables(p);
+            int role = joinResponse.getResponderRole();
+            PeerInfo oldLower = null;
+            PeerInfo oldHigher = null;
+            long responderVal = Long.parseLong(respondPeerInfo.getHexID(), 16);
+
+            for(PeerInfo p : joinResponse.getLeafset()){
+                long pVal = Long.parseLong(p.getHexID(), 16);
+                if (ls.clockwise(responderVal, pVal) < ls.clockwise(pVal, responderVal)) {
+                    oldHigher = p;
+                } else {
+                    oldLower = p;
+                }
             }
 
-            for(PeerInfo p : joinResponse.getRoutingTable()) { // make updates with joining peer's RT
-                updateTables(p);
+            if(role == JoinResponse.LOWER) {
+                ls.setLower(respondPeerInfo);
+                PeerInfo newHigher = (oldHigher != null) ? oldHigher : oldLower;
+                ls.setHigher(newHigher); 
+                if (newHigher != null) {
+                    LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.LOWER);
+                    send(newHigher, updateMsg);
+                }
+            } else if(role == JoinResponse.HIGHER) {
+                ls.setHigher(respondPeerInfo);
+                PeerInfo newLower = (oldLower != null) ? oldLower : oldHigher;
+                ls.setLower(newLower);
+                if (newLower != null) {
+                    LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.HIGHER);
+                    send(newLower, updateMsg);
+                }
+            }
+
+            if(ls.getLower() != null && ls.getHigher() == null) {
+                ls.setHigher(ls.getLower());
+            }
+            if(ls.getLower() == null && ls.getHigher() != null) {
+                ls.setLower(ls.getHigher());
             }
         }
-
-        updateAllPeers(); // update all nodes in LS and RT
-    }
-
-    private void updateAllPeers() {
-        List<PeerInfo> peers;
-        synchronized(lock) {
-            peers = new ArrayList<>(rt.getAllPeers());
-            peers.addAll(ls.getAllPeers());
-        }
-        for(PeerInfo p : peers) {
-            log.info(() -> "Sending update message to --> " + p.getHexID());
-            sendUpdateMessage(p, peers);
-        }
-    }
-
-    private void sendUpdateMessage(PeerInfo p, List<PeerInfo> peers) {
-        Update update = new Update(Protocol.UPDATE, myPeerInfo, peers);
-        send(p, update);
-    }
-
-    private boolean updateTables(PeerInfo joiningPeerInfo) {
-        boolean changed = false;
-        if(joiningPeerInfo.getHexID().equals(myHexID)) { // dont' add myself
-            return changed;
-        }
-        if(ls.addPeer(joiningPeerInfo, myHexID)) { // add to ls (will only add if it is able to update one of my current neighbors)
-            changed = true;
-        }
-        // now update routing table with any peer that I can use
-        int row = longestMatchingPrefixLength(myHexID, joiningPeerInfo.getHexID());
-        if(row < 4) { // don't add myself
-            int col = Character.digit(joiningPeerInfo.getHexID().charAt(row), 16);
-            if(rt.getPeerInfo(row, col) == null) {
-                rt.setPeerInfo(row, col, joiningPeerInfo);
-                sendReferenceMessage(joiningPeerInfo);
-            }
-        }
-        return changed;
     }
 
     private void sendReferenceMessage(PeerInfo peerInfo){
@@ -238,52 +216,58 @@ public class Peer implements Node {
     private void processJoinRequest(Event event, Socket socket) {
         JoinRequest joinRequest = (JoinRequest) event;
         log.info(() -> "Received join request for --> " + joinRequest.peerInfo.toString());
-        String joiningHexId = joinRequest.peerInfo.getHexID();
         PeerInfo joiningPeerInfo = joinRequest.peerInfo;
 
-        PeerInfo closestPeer = ls.findClosestNeighbor(joiningHexId);
-        if(closestPeer != null && isCloser(joiningHexId, closestPeer.getHexID(), myHexID)) { // I havc a closer peer in my ls
-            log.info(() -> "Forwarding request to peer in leafset --> " + closestPeer.getHexID());
-            forwardRequest(joinRequest, closestPeer);
+        PeerInfo closestPeer = closestOverallPeer(joiningPeerInfo.getHexID());
+        if (closestPeer != null && isCloser(joiningPeerInfo.getHexID(), closestPeer.getHexID(), myHexID)) {
+            log.info(() -> "Forwarding request to closer peer -> " + closestPeer.getHexID());
+            send(closestPeer, joinRequest);
             return;
         }
-        int row = longestMatchingPrefixLength(myHexID, joiningHexId);
-        int col = Character.digit(joiningHexId.charAt(row), 16);
-        if(row < 4) { // we are not the destination
-            if(rt.getPeerInfo(row, col) != null) { // we can make a big jump in rt
-                PeerInfo rtPeer = rt.getPeerInfo(row, col);
-                log.info(() -> "Forwarding request to peer in routing table --> " + rtPeer.getHexID());
-                forwardRequest(joinRequest, rtPeer);
-                return;
-            }
-        }
-        PeerInfo closestOverallPeer = closestOverallPeer(joiningHexId);
-        if(closestOverallPeer != null && isCloser(joiningHexId, closestOverallPeer.getHexID(), myHexID)) { // if the closest overall peer is closer than the joining peer
-            log.info(() -> "Forwarding request to closest overall peer --> " + closestOverallPeer.getHexID());
-            forwardRequest(joinRequest, closestOverallPeer);
-            return;
-        }
-        // I am the closest peer to the joining peer
-        log.info(() -> "Sending join response back to --> " + joinRequest.peerInfo.getHexID());
+
+        log.info(() -> "I am the closest peer. Sending join response to --> " + joiningPeerInfo.getHexID());
+
         List<PeerInfo> lsCopy;
         List<PeerInfo> rtCopy;
+        int responderPosition;
+
         synchronized(lock) {
-            updateTables(joiningPeerInfo);
-            lsCopy = new ArrayList<>(ls.getAllPeers());
-            rtCopy = new ArrayList<>(rt.getAllPeers()); 
+            lsCopy = ls.getAllPeers();
+            rtCopy = rt.getAllPeers();
         }
-        sendJoinResponse(joiningPeerInfo, myHexID, lsCopy, rtCopy);
-    }
 
-    private void sendJoinResponse(PeerInfo joinPeerInfo, String myHexID, List<PeerInfo> ls, List<PeerInfo> rt) {
-        ls.remove(joinPeerInfo);
-        rt.remove(joinPeerInfo);
-        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, myHexID, ls, rt);
-        send(joinPeerInfo, joinResponse);
-    }
+        long myVal = Long.parseLong(myHexID, 16);
+        long joiningVal = Long.parseLong(joiningPeerInfo.getHexID(), 16);
 
-    private void forwardRequest(JoinRequest joinRequest, PeerInfo peerInfo) {
-        send(peerInfo, joinRequest);
+        // now determine in which direction am I closer to the joining node
+        if(ls.clockwise(myVal, joiningVal) < ls.clockwise(joiningVal, myVal)) { // high side - set to new higher
+            responderPosition = JoinResponse.LOWER; // I will be its lower
+            synchronized(lock) {
+                ls.setHigher(joiningPeerInfo);
+                if(ls.getLower() == null) { // to complete ring when only two peers exist
+                    ls.setLower(joiningPeerInfo);
+                }
+            }
+        } else { // low side - set to new lower
+            responderPosition = JoinResponse.HIGHER;
+            synchronized(lock) {
+                ls.setLower(joiningPeerInfo);
+                if(ls.getHigher() == null) { // to complete ring when only two peers exist
+                    ls.setHigher(joiningPeerInfo);
+                }
+            }
+        }
+
+        int row = longestMatchingPrefixLength(myHexID, joiningPeerInfo.getHexID());
+        int col = Character.digit(joiningPeerInfo.getHexID().charAt(row), 16);
+
+        // send join response
+        synchronized(lock) {
+            rt.addPeer(joiningPeerInfo, row, col);
+        }
+        JoinResponse joinResponse = new JoinResponse(Protocol.JOIN_RESPONSE, myPeerInfo, responderPosition, myHexID, lsCopy, rtCopy);
+        send(joiningPeerInfo, joinResponse);
+        sendReferenceMessage(joiningPeerInfo);
     }
 
     private PeerInfo closestOverallPeer(String joiningNodeHexId) {
@@ -413,10 +397,10 @@ public class Peer implements Node {
             PeerInfo lower = ls.getLower();
             PeerInfo higher = ls.getHigher();
             if(lower != null) {
-                sendExitMessage(lower, myPeerInfo, higher);
+                sendExitMessage(lower, myPeerInfo, higher, Exit.HIGHER);
             }
             if(higher != null) {
-                sendExitMessage(higher, myPeerInfo, lower);
+                sendExitMessage(higher, myPeerInfo, lower, Exit.LOWER);
             }
             notifyReferences();
             log.info(() -> "Exit complete...");
@@ -438,9 +422,9 @@ public class Peer implements Node {
         }
     }
 
-    private void sendExitMessage(PeerInfo updatePeer, PeerInfo exitingPeer, PeerInfo newNeighbor) {
+    private void sendExitMessage(PeerInfo updatePeer, PeerInfo exitingPeer, PeerInfo newNeighbor, int role) {
         log.info(() -> "Sending exit message to --> " + updatePeer.getHexID());
-        Exit exitMessage = new Exit(Protocol.EXIT, exitingPeer, newNeighbor);
+        Exit exitMessage = new Exit(Protocol.EXIT, exitingPeer, newNeighbor, role);
         send(updatePeer, exitMessage);
     }
 
