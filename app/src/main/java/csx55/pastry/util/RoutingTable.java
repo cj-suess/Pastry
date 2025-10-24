@@ -14,6 +14,14 @@ public class RoutingTable {
         this.myHexId = myHexId;
     }
 
+    public boolean addPeer(PeerInfo peerInfo, int row, int col) {
+        if(getPeerInfo(row, col) == null) {
+            setPeerInfo(row, col, peerInfo);
+            return true;
+        }
+        return false;
+    }
+
     public void setPeerInfo(int row, int col, PeerInfo peerInfo){
         rt[row][col] = peerInfo;
     }

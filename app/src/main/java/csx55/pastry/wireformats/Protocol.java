@@ -9,9 +9,9 @@ public interface Protocol {
     int JOIN_REQUEST = 6;
     int JOIN_RESPONSE = 7;
     int NODE_ID = 8;
-    int UPDATE = 9;
-    int EXIT = 10;
-    int REFERENCE = 11;
-    int REFERENCE_NOTIFICATION = 12;
-    int HANDSHAKE = 13;
+    int EXIT = 9;
+    int REFERENCE = 10;
+    int REFERENCE_NOTIFICATION = 11;
+    int HANDSHAKE = 12;
+    int LEAFSET_UPDATE = 13;
 }

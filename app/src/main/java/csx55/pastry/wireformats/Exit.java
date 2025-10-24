@@ -4,15 +4,20 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class Exit extends Event {
+
+    public static final int LOWER = 0;
+    public static final int HIGHER = 1;
     
     int messageType;
     private final PeerInfo exitingPeer;
     private final PeerInfo newNeighbor;
+    private final int role;
 
-    public Exit(int messageType, PeerInfo exitingPeer, PeerInfo newNeighbor) {
+    public Exit(int messageType, PeerInfo exitingPeer, PeerInfo newNeighbor, int role) {
         this.messageType = messageType;
         this.exitingPeer = exitingPeer;
         this.newNeighbor = newNeighbor;
+        this.role = role;
     }
 
     @Override
@@ -29,6 +34,8 @@ public class Exit extends Event {
         writeString(dout, newNeighbor.getHexID());
         writeString(dout, newNeighbor.getIP());
         dout.writeInt(newNeighbor.getPort());
+
+        dout.writeInt(role);
     }
 
     public PeerInfo getExitingPeer() {
@@ -37,5 +44,9 @@ public class Exit extends Event {
 
     public PeerInfo getNewNeighbor() {
         return newNeighbor;
+    }
+
+    public int getRole() {
+        return role;
     }
 }

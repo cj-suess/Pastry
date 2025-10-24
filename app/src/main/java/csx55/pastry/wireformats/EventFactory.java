@@ -37,8 +37,6 @@ public class EventFactory {
                     return readJoinRequest(messageType, dis);
                 case Protocol.JOIN_RESPONSE:
                     return readJoinResponse(messageType, dis);
-                case Protocol.UPDATE:
-                    return readUpdateMessage(messageType, dis);
                 case Protocol.EXIT:
                     return readExitMessage(messageType, dis);
                 case Protocol.REFERENCE:
@@ -47,6 +45,8 @@ public class EventFactory {
                     return readReferenceRemoval(messageType, dis);
                 case Protocol.HANDSHAKE:
                     return readHandshake(messageType, dis);
+                case Protocol.LEAFSET_UPDATE:
+                    return readLeafsetUpdate(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -56,6 +56,10 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private LeafsetUpdate readLeafsetUpdate(int messageType, DataInputStream dis) throws IOException {
+        return new LeafsetUpdate(messageType, readPeerInfo(dis), dis.readInt());
     }
 
     private Register readHandshake(int messageType, DataInputStream dis) throws IOException {
@@ -73,30 +77,17 @@ public class EventFactory {
     private Exit readExitMessage(int messageType, DataInputStream dis) throws IOException {
         PeerInfo exitingPeer = readPeerInfo(dis);
         PeerInfo newNeighbor = readPeerInfo(dis);
-        return new Exit(messageType, exitingPeer, newNeighbor);
-    }
-
-    private Update readUpdateMessage(int messageType, DataInputStream dis) throws IOException {
-        PeerInfo updatePeer = readPeerInfo(dis);
-        List<PeerInfo> peers = readPeers(dis);
-        return new Update(messageType, updatePeer, peers);
-    }
-
-    private List<PeerInfo> readPeers(DataInputStream dis) throws IOException {
-        List<PeerInfo> peers = new ArrayList<>();
-        int peersLength = dis.readInt();
-        for(int i = 0; i < peersLength; i++) {
-            peers.add(readPeerInfo(dis));
-        }
-        return peers;
+        int role = dis.readInt();
+        return new Exit(messageType, exitingPeer, newNeighbor, role);
     }
 
     private JoinResponse readJoinResponse(int messageType, DataInputStream dis) throws IOException {
         PeerInfo respondingPeer = readPeerInfo(dis);
+        int responderRole = dis.readInt();
         String myHexId = readString(dis);
         List<PeerInfo> leafsetList = readLeafset(dis);
         List<PeerInfo> rtList = readRoutingTable(dis);
-        return new JoinResponse(messageType, respondingPeer, myHexId, leafsetList, rtList);
+        return new JoinResponse(messageType, respondingPeer, responderRole, myHexId, leafsetList, rtList);
     }
 
     private List<PeerInfo> readLeafset(DataInputStream dis) throws IOException {
