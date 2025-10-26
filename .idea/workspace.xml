@@ -5,6 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dfa7896b-e7af-4b4a-82c1-ac5d8bf1d60d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/csx55/pastry/node/Peer.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/csx55/pastry/node/Peer.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -20,12 +22,20 @@
   <component name="ExternalProjectsManager">
     <system id="GRADLE">
       <state>
+        <task path="$PROJECT_DIR$">
+          <activation />
+        </task>
         <projects_view>
           <tree_state>
             <expand>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="hw3" type="f1a62948:ProjectNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="hw3" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
               </path>
             </expand>
             <select />
@@ -68,7 +78,7 @@
       <window_info id="Backup and Sync History" />
       <window_info id="Commit_Guest" show_stripe_button="false" />
       <window_info id="Learn" show_stripe_button="false" />
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.19411376" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.2146164" />
       <window_info id="Commit" order="1" weight="0.21660054" />
       <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
       <window_info id="Pull Requests" order="3" weight="0.21660054" />
@@ -81,7 +91,7 @@
       <window_info anchor="bottom" id="Version Control" order="0" weight="0.24525316" />
       <window_info anchor="bottom" id="Problems" order="1" />
       <window_info anchor="bottom" id="Problems View" order="2" weight="0.24947257" />
-      <window_info active="true" anchor="bottom" id="Terminal" order="3" visible="true" weight="0.22204642" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="3" visible="true" weight="0.22626582" />
       <window_info anchor="bottom" id="Services" order="4" weight="0.20938818" />
       <window_info anchor="bottom" id="Find" order="5" weight="0.32964134" />
       <window_info anchor="right" id="Endpoints" />
@@ -89,7 +99,7 @@
       <window_info anchor="right" content_ui="combo" id="Notifications" order="0" weight="0.25" />
       <window_info anchor="right" id="AIAssistant" order="1" weight="0.25" />
       <window_info anchor="right" id="Database" order="2" weight="0.25" />
-      <window_info anchor="right" id="Gradle" order="3" visible="true" weight="0.2503307" />
+      <window_info anchor="right" id="Gradle" order="3" weight="0.2503307" />
       <window_info anchor="right" id="Maven" order="4" weight="0.25" />
     </layout>
   </component>
@@ -110,7 +120,8 @@
       <updated>1761406085324</updated>
       <workItem from="1761406087719" duration="689000" />
       <workItem from="1761407473309" duration="6563000" />
-      <workItem from="1761490829142" duration="60000" />
+      <workItem from="1761490829142" duration="649000" />
+      <workItem from="1761492131085" duration="1005000" />
     </task>
     <servers />
   </component>

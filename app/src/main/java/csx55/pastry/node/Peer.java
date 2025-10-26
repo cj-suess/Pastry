@@ -28,7 +28,7 @@ public class Peer implements Node {
     RoutingTable rt;
 
     private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
-    private Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
+    private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
     private Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
@@ -152,49 +152,56 @@ public class Peer implements Node {
 
     private void processJoinResponse(Event event, Socket socket) {
         JoinResponse joinResponse = (JoinResponse) event;
-        PeerInfo respondPeerInfo = joinResponse.getRespondingPeer();
-        log.info(() -> "Received join response from --> " + respondPeerInfo.toString());
+        PeerInfo respondingPeer = joinResponse.getRespondingPeer();
+        log.info(() -> "Received join response from --> " + respondingPeer.toString());
 
         synchronized(lock) {
-            for(PeerInfo p : joinResponse.getRoutingTable()) {
-                if(!p.getHexID().equals(myHexID)) {
+            // update rt with responding peer's applicable entries
+            for(PeerInfo p : joinResponse.getRoutingTable()){
+                if(!p.getHexID().equals(myHexID)){
                     int row = longestMatchingPrefixLength(myHexID, p.getHexID());
                     int col = Character.digit(p.getHexID().charAt(row), 16);
                     if(rt.addPeer(p, row, col)) { sendReferenceMessage(p); }
                 }
             }
-            int row = longestMatchingPrefixLength(myHexID, respondPeerInfo.getHexID());
-            int col = Character.digit(respondPeerInfo.getHexID().charAt(row), 16);
-            if(rt.addPeer(respondPeerInfo, row, col)) { sendReferenceMessage(respondPeerInfo); }
+            //  aslo update rt with the responding peer
+            int row = longestMatchingPrefixLength(myHexID, respondingPeer.getHexID());
+            int col = Character.digit(respondingPeer.getHexID().charAt(row), 16);
+            if(rt.addPeer(respondingPeer, row, col)) { sendReferenceMessage(respondingPeer); }
 
-            int role = joinResponse.getResponderRole();
-            PeerInfo oldLower = null;
-            PeerInfo oldHigher = null;
-            long myVal = Long.parseLong(myHexID, 16);
+            // trying to build a leafset take 808
+            int responderRole = joinResponse.getResponderRole();
+            List<PeerInfo> respondersOldLeafset = joinResponse.getLeafset();
+            long responderVal = Long.parseLong(respondingPeer.getHexID(), 16);
 
-            for(PeerInfo p : joinResponse.getLeafset()){
-                long pVal = Long.parseLong(p.getHexID(), 16);
-                if (ls.clockwise(pVal, myVal) < ls.clockwise(myVal, pVal)) {
-                    oldLower = p;
-                } else {
-                    oldHigher = p;
+            if(responderRole == JoinResponse.LOWER) { // this is my lower
+                ls.setLower(respondingPeer);
+                // find the furthest peer in their leafset cw to get my higher
+                PeerInfo higher = null;
+                long minDist = Long.MAX_VALUE;
+                for(PeerInfo p : respondersOldLeafset){
+                    if(p.equals(respondingPeer)) { continue; }
+                    long dist = ls.clockwise(responderVal, Long.parseLong(p.getHexID(), 16));
+                    if(dist < minDist) {
+                        minDist = dist;
+                        higher = p;
+                    }
                 }
-            }
-
-            if(role == JoinResponse.LOWER) {
-                ls.setLower(respondPeerInfo);
-                if (oldHigher != null) {
-                    ls.setHigher(oldHigher);
-                    LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.LOWER);
-                    send(oldHigher, updateMsg);
+                ls.setHigher(higher);
+            } else { // this is my higher
+                ls.setHigher(respondingPeer);
+                // look for the furthest ccw peer to get my lower
+                PeerInfo lower = null;
+                long minDist = Long.MAX_VALUE;
+                for(PeerInfo p : respondersOldLeafset){
+                    if(p.equals(respondingPeer)) { continue; }
+                    long dist = ls.clockwise(Long.parseLong(p.getHexID(), 16), responderVal);
+                    if(dist < minDist) {
+                        minDist = dist;
+                        lower = p;
+                    }
                 }
-            } else if(role == JoinResponse.HIGHER) {
-                ls.setHigher(respondPeerInfo);
-                if (oldLower != null) {
-                    ls.setLower(oldLower);
-                    LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.HIGHER);
-                    send(oldLower, updateMsg);
-                }
+                ls.setLower(lower);
             }
 
             if(ls.getLower() != null && ls.getHigher() == null) {
@@ -376,7 +383,7 @@ public class Peer implements Node {
     }
 
     private void startNode() {
-        try(ServerSocket serverSocket = new ServerSocket(0);) {
+        try(ServerSocket serverSocket = new ServerSocket(0)) {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
