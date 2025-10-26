@@ -14,4 +14,5 @@ public interface Protocol {
     int REFERENCE_NOTIFICATION = 11;
     int HANDSHAKE = 12;
     int LEAFSET_UPDATE = 13;
+    int ROUTING_UPDATE = 14;
 }
