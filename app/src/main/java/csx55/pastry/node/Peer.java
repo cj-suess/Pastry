@@ -19,20 +19,20 @@ public class Peer implements Node {
     private final Object lock = new Object();
 
     private boolean running = true;
-    private ConnInfo regNodeInfo;
+    private final ConnInfo regNodeInfo;
     private TCPConnection regConn;
 
-    private String myHexID;
+    private final String myHexID;
     public PeerInfo myPeerInfo;
     Leafset ls;
     RoutingTable rt;
 
-    private Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+    private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
-    private Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
+    private final Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
-    private Map<String, Runnable> commands = new HashMap<>();
+    private final Map<String, Runnable> commands = new HashMap<>();
 
     public Peer(String host, int port, String hexID) {
         regNodeInfo = new ConnInfo(host, port);
@@ -64,18 +64,34 @@ public class Peer implements Node {
     }
 
     private void startsEvents() {
-        events = Map.of(
-            Protocol.REGISTER_RESPONSE, this::registerResponse,
-            Protocol.DEREGISTER_RESPONSE, this::deregisterResponse,
-            Protocol.ENTRY_NODE, this::processEntryNode,
-            Protocol.JOIN_REQUEST, this::processJoinRequest,
-            Protocol.JOIN_RESPONSE, this::processJoinResponse, 
-            Protocol.LEAFSET_UPDATE, this::processLeafsetUpdate,
-            Protocol.EXIT, this::processExit,
-            Protocol.REFERENCE, this::processReference,
-            Protocol.REFERENCE_NOTIFICATION, this::processReferenceRemoval,
-            Protocol.HANDSHAKE, this::processHandshake
-        );
+        events.put(Protocol.REGISTER_RESPONSE, this::registerResponse);
+        events.put(Protocol.DEREGISTER_RESPONSE, this::deregisterResponse);
+        events.put(Protocol.ENTRY_NODE, this::processEntryNode);
+        events.put(Protocol.JOIN_REQUEST, this::processJoinRequest);
+        events.put(Protocol.JOIN_RESPONSE, this::processJoinResponse);
+        events.put(Protocol.LEAFSET_UPDATE, this::processLeafsetUpdate);
+        events.put(Protocol.EXIT, this::processExit);
+        events.put(Protocol.REFERENCE, this::processReference);
+        events.put(Protocol.REFERENCE_NOTIFICATION, this::processReferenceRemoval);
+        events.put(Protocol.HANDSHAKE, this::processHandshake);
+        events.put(Protocol.ROUTING_UPDATE, this::processRoutingUpdate);
+    }
+
+    private void processRoutingUpdate(Event event, Socket socket) {
+        RoutingUpdate routingUpdate = (RoutingUpdate) event;
+        log.info(() -> "Received routing update...");
+        // add whatever peers I can to my rt
+        synchronized(lock) {
+            for(PeerInfo p : routingUpdate.getRoutingList()) {
+                if(p.getHexID().equals(myHexID)) { continue; }
+                int row = longestMatchingPrefixLength(myHexID, p.getHexID());
+                int col = Character.digit(p.getHexID().charAt(row), 16);
+                if(rt.addPeer(p, row, col)) {
+                    log.info(() -> "Adding peer " + p.getHexID());
+                    sendReferenceMessage(p);
+                }
+            }
+        }
     }
 
     private void processLeafsetUpdate(Event event, Socket socket) {
@@ -155,6 +171,8 @@ public class Peer implements Node {
         PeerInfo respondingPeer = joinResponse.getRespondingPeer();
         log.info(() -> "Received join response from --> " + respondingPeer.toString());
 
+        List<PeerInfo> rtCopy;
+
         synchronized(lock) {
             // update rt with responding peer's applicable entries
             for(PeerInfo p : joinResponse.getRoutingTable()){
@@ -210,12 +228,27 @@ public class Peer implements Node {
             if(ls.getLower() == null && ls.getHigher() != null) {
                 ls.setLower(ls.getHigher());
             }
+
+            // copy updated rt
+            rtCopy = rt.getAllPeers();
+        }
+        // send updated rt to peers so they can add what they can
+        sendRoutingUpdate(new RoutingUpdate(Protocol.ROUTING_UPDATE, rtCopy));
+    }
+
+    private void sendRoutingUpdate(RoutingUpdate routingUpdate) {
+        List<PeerInfo> peers;
+        synchronized(lock) {
+            peers = rt.getAllPeers();
+            peers.addAll(ls.getAllPeers());
+        }
+        for(PeerInfo p : peers) {
+            send(p, routingUpdate);
         }
     }
 
     private void sendReferenceMessage(PeerInfo peerInfo){
-        Register referenceMessage = new Register(Protocol.REFERENCE, myPeerInfo);
-        send(peerInfo, referenceMessage);
+        send(peerInfo, new Register(Protocol.REFERENCE, myPeerInfo));
     }
 
     private void processJoinRequest(Event event, Socket socket) {

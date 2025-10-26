@@ -47,6 +47,8 @@ public class EventFactory {
                     return readHandshake(messageType, dis);
                 case Protocol.LEAFSET_UPDATE:
                     return readLeafsetUpdate(messageType, dis);
+                case Protocol.ROUTING_UPDATE:
+                    return readRoutingUpdate(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -56,6 +58,10 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private RoutingUpdate readRoutingUpdate(int messageType, DataInputStream dis) throws IOException {
+        return new RoutingUpdate(messageType, readRoutingTable(dis));
     }
 
     private LeafsetUpdate readLeafsetUpdate(int messageType, DataInputStream dis) throws IOException {
