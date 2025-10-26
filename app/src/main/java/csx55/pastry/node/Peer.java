@@ -203,7 +203,7 @@ public class Peer implements Node {
                 }
                 ls.setLower(lower);
             }
-
+            // complete ring when only two peers exist
             if(ls.getLower() != null && ls.getHigher() == null) {
                 ls.setHigher(ls.getLower());
             }
@@ -255,8 +255,7 @@ public class Peer implements Node {
 
                 // update my old higher that the joiner is now its lower neighbor
                 if (oldHigher != null) {
-                    LeafsetUpdate update = new LeafsetUpdate(
-                            Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.LOWER);
+                    LeafsetUpdate update = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.LOWER);
                     send(oldHigher, update);
                 }
 
@@ -272,8 +271,7 @@ public class Peer implements Node {
 
                 // update my old lower that the joiner is now its higher neighbor
                 if (oldLower != null) {
-                    LeafsetUpdate update = new LeafsetUpdate(
-                            Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.HIGHER);
+                    LeafsetUpdate update = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.HIGHER);
                     send(oldLower, update);
                 }
 
