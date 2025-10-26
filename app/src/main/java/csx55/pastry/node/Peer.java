@@ -154,7 +154,7 @@ public class Peer implements Node {
         JoinResponse joinResponse = (JoinResponse) event;
         PeerInfo respondPeerInfo = joinResponse.getRespondingPeer();
         log.info(() -> "Received join response from --> " + respondPeerInfo.toString());
-        
+
         synchronized(lock) {
             for(PeerInfo p : joinResponse.getRoutingTable()) {
                 if(!p.getHexID().equals(myHexID)) {
@@ -170,32 +170,30 @@ public class Peer implements Node {
             int role = joinResponse.getResponderRole();
             PeerInfo oldLower = null;
             PeerInfo oldHigher = null;
-            long responderVal = Long.parseLong(respondPeerInfo.getHexID(), 16);
+            long myVal = Long.parseLong(myHexID, 16);
 
             for(PeerInfo p : joinResponse.getLeafset()){
                 long pVal = Long.parseLong(p.getHexID(), 16);
-                if (ls.clockwise(responderVal, pVal) < ls.clockwise(pVal, responderVal)) {
-                    oldHigher = p;
-                } else {
+                if (ls.clockwise(pVal, myVal) < ls.clockwise(myVal, pVal)) {
                     oldLower = p;
+                } else {
+                    oldHigher = p;
                 }
             }
 
             if(role == JoinResponse.LOWER) {
                 ls.setLower(respondPeerInfo);
-                PeerInfo newHigher = (oldHigher != null) ? oldHigher : oldLower;
-                ls.setHigher(newHigher); 
-                if (newHigher != null) {
+                if (oldHigher != null) {
+                    ls.setHigher(oldHigher);
                     LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.LOWER);
-                    send(newHigher, updateMsg);
+                    send(oldHigher, updateMsg);
                 }
             } else if(role == JoinResponse.HIGHER) {
                 ls.setHigher(respondPeerInfo);
-                PeerInfo newLower = (oldLower != null) ? oldLower : oldHigher;
-                ls.setLower(newLower);
-                if (newLower != null) {
+                if (oldLower != null) {
+                    ls.setLower(oldLower);
                     LeafsetUpdate updateMsg = new LeafsetUpdate(Protocol.LEAFSET_UPDATE, myPeerInfo, LeafsetUpdate.HIGHER);
-                    send(newLower, updateMsg);
+                    send(oldLower, updateMsg);
                 }
             }
 
@@ -238,21 +236,41 @@ public class Peer implements Node {
 
         long myVal = Long.parseLong(myHexID, 16);
         long joiningVal = Long.parseLong(joiningPeerInfo.getHexID(), 16);
+        long cwDist = ls.clockwise(myVal, joiningVal);
+        long ccwDist = ls.clockwise(joiningVal, myVal);
 
         // now determine in which direction am I closer to the joining node
-        if(ls.clockwise(myVal, joiningVal) < ls.clockwise(joiningVal, myVal)) { // high side - set to new higher
-            responderPosition = JoinResponse.LOWER; // I will be its lower
-            synchronized(lock) {
+        if (cwDist < ccwDist) { // joining peer is on my high side
+            responderPosition = JoinResponse.LOWER; // I'm lower relative to the joiner
+            synchronized (lock) {
+                PeerInfo oldHigher = ls.getHigher();
                 ls.setHigher(joiningPeerInfo);
-                if(ls.getLower() == null) { // to complete ring when only two peers exist
+
+                // update my old higher that the joiner is now its lower neighbor
+                if (oldHigher != null) {
+                    LeafsetUpdate update = new LeafsetUpdate(
+                            Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.LOWER);
+                    send(oldHigher, update);
+                }
+
+                if (ls.getLower() == null) {
                     ls.setLower(joiningPeerInfo);
                 }
             }
-        } else { // low side - set to new lower
-            responderPosition = JoinResponse.HIGHER;
-            synchronized(lock) {
+        } else { // joining peer is on my low side
+            responderPosition = JoinResponse.HIGHER; // I'm higher relative to the joiner
+            synchronized (lock) {
+                PeerInfo oldLower = ls.getLower();
                 ls.setLower(joiningPeerInfo);
-                if(ls.getHigher() == null) { // to complete ring when only two peers exist
+
+                // update my old lower that the joiner is now its higher neighbor
+                if (oldLower != null) {
+                    LeafsetUpdate update = new LeafsetUpdate(
+                            Protocol.LEAFSET_UPDATE, joiningPeerInfo, LeafsetUpdate.HIGHER);
+                    send(oldLower, update);
+                }
+
+                if (ls.getHigher() == null) {
                     ls.setHigher(joiningPeerInfo);
                 }
             }
@@ -280,6 +298,7 @@ public class Peer implements Node {
             allPeers.addAll(ls.getAllPeers());
         }
         for(PeerInfo peer : allPeers) {
+            if (peer.getHexID().equals(myHexID)) continue;
             long currPeerVal = Long.parseLong(peer.getHexID(), 16);
             long distance = ls.calculateMinDistance(joiningNodeVal, currPeerVal);
             if(distance < minDistance){
