@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dfa7896b-e7af-4b4a-82c1-ac5d8bf1d60d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/csx55/pastry/node/Peer.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/csx55/pastry/node/Peer.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -90,7 +88,7 @@
       <window_info anchor="bottom" id="File Transfer" />
       <window_info anchor="bottom" id="Version Control" order="0" weight="0.24525316" />
       <window_info anchor="bottom" id="Problems" order="1" />
-      <window_info anchor="bottom" id="Problems View" order="2" weight="0.24947257" />
+      <window_info anchor="bottom" id="Problems View" order="2" weight="0.22626582" />
       <window_info active="true" anchor="bottom" id="Terminal" order="3" visible="true" weight="0.22626582" />
       <window_info anchor="bottom" id="Services" order="4" weight="0.20938818" />
       <window_info anchor="bottom" id="Find" order="5" weight="0.32964134" />
@@ -121,7 +119,7 @@
       <workItem from="1761406087719" duration="689000" />
       <workItem from="1761407473309" duration="6563000" />
       <workItem from="1761490829142" duration="649000" />
-      <workItem from="1761492131085" duration="1005000" />
+      <workItem from="1761492131085" duration="2382000" />
     </task>
     <servers />
   </component>
