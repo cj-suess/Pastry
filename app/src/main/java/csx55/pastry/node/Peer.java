@@ -5,11 +5,15 @@ import csx55.pastry.util.*;
 import csx55.pastry.wireformats.*;
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.*;
+import java.util.stream.Stream;
 
 public class Peer implements Node {
 
@@ -17,6 +21,7 @@ public class Peer implements Node {
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
     private final Object lock = new Object();
+    private final Converter c = Converter.getConverter();
 
     private boolean running = true;
     private final ConnInfo regNodeInfo;
@@ -26,6 +31,7 @@ public class Peer implements Node {
     public PeerInfo myPeerInfo;
     Leafset ls;
     RoutingTable rt;
+    private Path path;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
@@ -413,11 +419,16 @@ public class Peer implements Node {
             }
     }
 
-    private void startNode() {
+    @Override
+    public void startNode() {
         try(ServerSocket serverSocket = new ServerSocket(0)) {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
+
+            // create directory in tmp
+            path = Paths.get("/tmp/" + myHexID);
+            Files.createDirectories(path);
 
             while(running) {
                 Socket clientSocket = serverSocket.accept();
@@ -462,12 +473,17 @@ public class Peer implements Node {
             notifyReferences();
             log.info(() -> "Exit complete...");
         }
-        for(TCPConnection conn : peerToConn.values()){
+        for(TCPConnection conn : peerToConn.values()) {
             try {
                 conn.socket.close();
             } catch (IOException e) {
                 warning.accept(e);
             }
+        }
+        try{
+            Files.deleteIfExists(path);
+        } catch(IOException e) {
+            warning.accept(e);
         }
         System.exit(0);
     }
@@ -491,6 +507,17 @@ public class Peer implements Node {
         commands.put("leaf-set", this::printLeafset);
         commands.put("routing-table", this::printRoutingTable);
         commands.put("print-connections", this::printConnections);
+        commands.put("list-files", this::listFiles);
+    }
+
+    private void listFiles() {
+        try(Stream<Path> stream = Files.list(path)){
+            stream.forEach(file -> {
+                System.out.println(file + ", " + c.convertBytesToHex(Converter.hash16(file.getFileName().toString())));
+            });
+        } catch (IOException e) {
+            warning.accept(e);
+        }
     }
 
     private void printConnections() {
