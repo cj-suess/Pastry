@@ -150,8 +150,8 @@ public class Data implements Node {
     private void retrieve(PeerInfo peerInfo) {
         Path path = Paths.get(filePath);
         String fileName = path.getFileName().toString();
-        RetreiveRequest retreiveRequest = new RetreiveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
-        sendRequest(retreiveRequest, peerInfo);
+        RetrieveRequest retrieveRequest = new RetrieveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
+        sendRequest(retrieveRequest, peerInfo);
     }
 
     public static void main(String[] args) {

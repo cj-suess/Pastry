@@ -4,14 +4,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
 
-public class RetreiveRequest extends Event{
+public class RetrieveRequest extends Event{
 
     private final int messageType;
     private final PeerInfo dataNode;
     private final String fileName;
     private final List<String> routingPath;
 
-    public RetreiveRequest(int messageType, PeerInfo peerInfo, String fileName, List<String> routingPath) {
+    public RetrieveRequest(int messageType, PeerInfo peerInfo, String fileName, List<String> routingPath) {
         this.messageType = messageType;
         this.dataNode = peerInfo;
         this.fileName = fileName;

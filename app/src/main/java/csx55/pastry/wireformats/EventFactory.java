@@ -72,11 +72,11 @@ public class EventFactory {
         return new RetrieveResponse(messageType, readRoutingPath(dis));
     }
 
-    private RetreiveRequest readRetreiveRequest(int messageType, DataInputStream dis) throws IOException {
+    private RetrieveRequest readRetreiveRequest(int messageType, DataInputStream dis) throws IOException {
         PeerInfo dataNode = readPeerInfo(dis);
         String fileName = readString(dis);
         List<String> routingPath = readRoutingPath(dis);
-        return new RetreiveRequest(messageType, dataNode, fileName, routingPath);
+        return new RetrieveRequest(messageType, dataNode, fileName, routingPath);
     }
 
     private StoreResponse readStoreResponse(int messageType, DataInputStream dis) throws IOException {

@@ -86,7 +86,7 @@ public class Peer implements Node {
     }
 
     private void processRetrieveRequest(Event event, Socket socket) {
-        RetreiveRequest retrieveRequest = (RetreiveRequest) event;
+        RetrieveRequest retrieveRequest = (RetrieveRequest) event;
         log.info(() -> "Received retrieve request...");
         String fileName = retrieveRequest.getFileName();
         String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
