@@ -55,6 +55,8 @@ public class EventFactory {
                     return readStoreResponse(messageType, dis);
                 case Protocol.RETRIEVE_REQUEST:
                     return readRetreiveRequest(messageType, dis);
+                case Protocol.RETRIEVE_RESPONSE:
+                    return readRetrieveResponse(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -64,6 +66,10 @@ public class EventFactory {
             warning.accept(e);
         }
         return null;
+    }
+
+    private RetrieveResponse readRetrieveResponse(int messageType, DataInputStream dis) throws IOException {
+        return new RetrieveResponse(messageType, readRoutingPath(dis));
     }
 
     private RetreiveRequest readRetreiveRequest(int messageType, DataInputStream dis) throws IOException {
