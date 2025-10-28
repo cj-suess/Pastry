@@ -14,4 +14,8 @@ public interface Protocol {
     int HANDSHAKE = 11;
     int LEAFSET_UPDATE = 12;
     int ROUTING_UPDATE = 13;
+    int STORE_REQUEST = 14;
+    int STORE_RESPONSE = 15;
+    int RETRIEVE_REQUEST = 16;
+    int RETRIEVE_RESPONSE = 17;
 }

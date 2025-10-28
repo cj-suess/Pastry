@@ -8,6 +8,8 @@ import csx55.pastry.wireformats.*;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,18 +29,17 @@ public class Data implements Node {
     private boolean running = true;
     private final ConnInfo discConnInfo;
     private final String mode;
-    private final String path;
-    private PeerInfo entryNode;
+    private final String filePath;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
 
-    public Data(String discHost, int discPort,  String mode, String path) {
+    public Data(String discHost, int discPort,  String mode, String filePath) {
         discConnInfo = new ConnInfo(discHost, discPort);
         this.mode = mode;
-        this.path = path;
+        this.filePath = filePath;
         startEvents();
     }
 
@@ -51,7 +52,12 @@ public class Data implements Node {
     private void processEntryNode(Event event, Socket socket) {
         EntryNode entryNodeMessage = (EntryNode) event;
         log.info(() -> "Received entry node from Discovery --> " + entryNodeMessage.peerInfo.toString());
-        entryNode = entryNodeMessage.peerInfo;
+        PeerInfo entryNode = entryNodeMessage.peerInfo;
+        if(mode.equals("store")) {
+            store();
+        } else if(mode.equals("retrieve")) {
+            retrieve();
+        }
     }
 
     @Override
@@ -93,6 +99,10 @@ public class Data implements Node {
     }
 
     private void store() {
+        Path path = Paths.get(filePath);
+        String fileName = path.getFileName().toString();
+        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+        // StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileHex);
 
     }
 
