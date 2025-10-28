@@ -53,6 +53,7 @@ public class Data implements Node {
     }
 
     private void processStoreResponse(Event event, Socket socket) {
+        log.info(() -> "Received store response....");
         StoreResponse storeResponse = (StoreResponse) event;
         for(String s : storeResponse.getRoutingPath()) {
             System.out.println(s);
@@ -102,7 +103,7 @@ public class Data implements Node {
         try{
             Socket socket = new Socket(discConnInfo.getIP(), discConnInfo.getPort());
             TCPConnection conn = new TCPConnection(socket, this);
-            EntryNode getEntryNode = new EntryNode(Protocol.ENTRY_NODE, null);
+            EntryNode getEntryNode = new EntryNode(Protocol.ENTRY_NODE, new PeerInfo("", new ConnInfo("", 0)));
             conn.startReceiverThread();
             conn.sender.sendData(getEntryNode.getBytes());
         } catch (IOException e) {

@@ -544,7 +544,7 @@ public class Peer implements Node {
     private void listFiles() {
         try(Stream<Path> stream = Files.list(dataDir)){
             stream.forEach(file -> {
-                System.out.println(file + ", " + c.convertBytesToHex(Converter.hash16(file.getFileName().toString())));
+                System.out.println(file.getFileName() + ", " + c.convertBytesToHex(Converter.hash16(file.getFileName().toString())));
             });
         } catch (IOException e) {
             warning.accept(e);
