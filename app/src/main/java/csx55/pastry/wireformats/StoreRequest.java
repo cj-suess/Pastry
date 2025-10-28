@@ -7,13 +7,13 @@ import java.util.*;
 public class StoreRequest extends Event {
 
     private final int messageType;
-    private final String fileHex;
+    private final String fileName;
     private final byte[] data;
     private final List<String> routingPath;
 
-    public StoreRequest(int messageType, String fileHex,  byte[] data, List<String> routingPath) {
+    public StoreRequest(int messageType, String fileName,  byte[] data, List<String> routingPath) {
         this.messageType = messageType;
-        this.fileHex = fileHex;
+        this.fileName = fileName;
         this.data = data;
         this.routingPath = routingPath;
     }
@@ -25,14 +25,14 @@ public class StoreRequest extends Event {
 
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
-        writeString(dout, fileHex);
+        writeString(dout, fileName);
         writeData(dout);
         writeRouting(dout);
     }
 
     public byte[] getData() { return data; }
 
-    public String  getFileHex() { return fileHex; }
+    public String  getFileName() { return fileName; }
 
     public List<String> getRoutingPath() { return routingPath; }
 

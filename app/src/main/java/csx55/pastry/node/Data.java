@@ -105,9 +105,8 @@ public class Data implements Node {
         try {
             Path path = Paths.get(filePath);
             String fileName = path.getFileName().toString();
-            String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
             byte[] data = Files.readAllBytes(path);
-            StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileHex, data, new ArrayList<>());
+            StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileName, data, new ArrayList<>());
         } catch(IOException e) {
             warning.accept(e);
         }

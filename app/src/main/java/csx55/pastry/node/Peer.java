@@ -31,7 +31,7 @@ public class Peer implements Node {
     public PeerInfo myPeerInfo;
     Leafset ls;
     RoutingTable rt;
-    private Path path;
+    private Path dataDir;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
@@ -87,7 +87,9 @@ public class Peer implements Node {
     private void processStoreRequest(Event event, Socket socket) {
         StoreRequest storeRequest = (StoreRequest) event;
         log.info(() -> "Received store request...");
-        String fileHex = storeRequest.getFileHex();
+        String fileName = storeRequest.getFileName();
+        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+        byte[] data = storeRequest.getData();
         storeRequest.getRoutingPath().add(myHexID);
 
         PeerInfo closestPeer = closestOverallPeer(fileHex);
@@ -98,6 +100,17 @@ public class Peer implements Node {
         }
 
         log.info(() -> "Storing data. Sending store response back to data node...");
+        storeData(fileName, data);
+        // send store response
+    }
+
+    private void storeData(String fileName, byte[] data) {
+        try {
+            Path path = dataDir.resolve(fileName);
+            Files.write(path, data);
+        } catch (IOException e) {
+            warning.accept(e);
+        }
     }
 
     private void processRoutingUpdate(Event event, Socket socket) {
@@ -444,8 +457,8 @@ public class Peer implements Node {
             register();
 
             // create directory in tmp
-            path = Paths.get("/tmp/" + myHexID);
-            Files.createDirectories(path);
+            dataDir = Paths.get("/tmp/" + myHexID);
+            Files.createDirectories(dataDir);
 
             while(running) {
                 Socket clientSocket = serverSocket.accept();
@@ -498,7 +511,7 @@ public class Peer implements Node {
             }
         }
         try{
-            Files.deleteIfExists(path);
+            Files.deleteIfExists(dataDir);
         } catch(IOException e) {
             warning.accept(e);
         }
@@ -528,7 +541,7 @@ public class Peer implements Node {
     }
 
     private void listFiles() {
-        try(Stream<Path> stream = Files.list(path)){
+        try(Stream<Path> stream = Files.list(dataDir)){
             stream.forEach(file -> {
                 System.out.println(file + ", " + c.convertBytesToHex(Converter.hash16(file.getFileName().toString())));
             });
