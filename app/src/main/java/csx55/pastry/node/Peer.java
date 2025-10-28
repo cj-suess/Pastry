@@ -571,7 +571,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();

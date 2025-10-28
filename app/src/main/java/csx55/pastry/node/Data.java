@@ -26,6 +26,7 @@ public class Data implements Node {
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
     private final Converter c = Converter.getConverter();
+    private boolean running = true;
 
     private final ConnInfo discConnInfo;
     private final String mode;
@@ -59,6 +60,7 @@ public class Data implements Node {
             System.out.println(s);
         }
         System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
+        System.exit(0);
     }
 
     private void processEntryNode(Event event, Socket socket) {
@@ -88,7 +90,7 @@ public class Data implements Node {
             myPeerInfo = new PeerInfo("", new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Data.class.getName());
             getEntryNode();
-            while(true) {
+            while(running) {
                 Socket socket = serverSocket.accept();
                 TCPConnection conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
@@ -141,7 +143,7 @@ public class Data implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Data data = new Data(args[0], Integer.parseInt(args[1]), args[2], args[3]);
         new Thread(data::startNode, "Node-" + data.toString() + "-Server").start();
 
