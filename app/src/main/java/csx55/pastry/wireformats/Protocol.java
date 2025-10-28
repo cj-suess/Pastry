@@ -8,11 +8,14 @@ public interface Protocol {
     int ENTRY_NODE = 5;
     int JOIN_REQUEST = 6;
     int JOIN_RESPONSE = 7;
-    int NODE_ID = 8;
-    int EXIT = 9;
-    int REFERENCE = 10;
-    int REFERENCE_NOTIFICATION = 11;
-    int HANDSHAKE = 12;
-    int LEAFSET_UPDATE = 13;
-    int ROUTING_UPDATE = 14;
+    int EXIT = 8;
+    int REFERENCE = 9;
+    int REFERENCE_NOTIFICATION = 10;
+    int HANDSHAKE = 11;
+    int LEAFSET_UPDATE = 12;
+    int ROUTING_UPDATE = 13;
+    int STORE_REQUEST = 14;
+    int STORE_RESPONSE = 15;
+    int RETRIEVE_REQUEST = 16;
+    int RETRIEVE_RESPONSE = 17;
 }

@@ -48,8 +48,16 @@ public class Discover implements Node {
     private void startEvents() {
         events = Map.of(
             Protocol.REGISTER_REQUEST, this::registerRequest,
-            Protocol.DEREGISTER_REQUEST, this::deregisterRequest
+            Protocol.DEREGISTER_REQUEST, this::deregisterRequest,
+            Protocol.ENTRY_NODE, this::dataEntryNode
         );
+    }
+
+    private void dataEntryNode(Event event, Socket socket) {
+        log.info(() -> "Responding to data entry node request...");
+        TCPConnection conn = socketToConn.get(socket);
+        TCPSender sender = conn.getSender();
+        sendEntryNode(sender);
     }
 
     private void registerRequest(Event event, Socket socket) {
@@ -58,7 +66,7 @@ public class Discover implements Node {
         TCPSender sender = conn.getSender();
         Register registerEvent = (Register) event;
         if (!peerToConnMap.containsKey(registerEvent.peerInfo)) {
-            if(peerToConnMap.size() > 0) {
+            if(!peerToConnMap.isEmpty()) {
                 log.info(() -> "Sending entry node to " + registerEvent.peerInfo.getHexID());
                 sendEntryNode(sender);
             }
@@ -82,8 +90,7 @@ public class Discover implements Node {
 
     private PeerInfo getRandomEntryNode() {
         List<PeerInfo> list = new ArrayList<>(peerToConnMap.keySet());
-        PeerInfo peerInfo = list.get(rand.nextInt(list.size()));
-        return peerInfo;
+        return list.get(rand.nextInt(list.size()));
     }
 
     private void deregisterRequest(Event event, Socket socket) {
@@ -126,7 +133,8 @@ public class Discover implements Node {
         });
     }
 
-    private void startDiscovery() {
+    @Override
+    public void startNode() {
         try {
             serverSocket = new ServerSocket(port);
             log.info("Discovery node is up and running. Listening on port: " + port);
@@ -184,9 +192,9 @@ public class Discover implements Node {
     }
 
     public static void main(String[] args) {
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Discover discovery = new Discover(Integer.parseInt(args[0]));
-        new Thread(discovery::startDiscovery).start();
+        new Thread(discovery::startNode).start();
         new Thread(discovery::readTerminal).start();
     }
     

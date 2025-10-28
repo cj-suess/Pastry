@@ -5,11 +5,15 @@ import csx55.pastry.util.*;
 import csx55.pastry.wireformats.*;
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.*;
+import java.util.stream.Stream;
 
 public class Peer implements Node {
 
@@ -17,6 +21,7 @@ public class Peer implements Node {
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
     private final Object lock = new Object();
+    private final Converter c = Converter.getConverter();
 
     private boolean running = true;
     private final ConnInfo regNodeInfo;
@@ -26,6 +31,7 @@ public class Peer implements Node {
     public PeerInfo myPeerInfo;
     Leafset ls;
     RoutingTable rt;
+    private Path dataDir;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
@@ -75,6 +81,37 @@ public class Peer implements Node {
         events.put(Protocol.REFERENCE_NOTIFICATION, this::processReferenceRemoval);
         events.put(Protocol.HANDSHAKE, this::processHandshake);
         events.put(Protocol.ROUTING_UPDATE, this::processRoutingUpdate);
+        events.put(Protocol.STORE_REQUEST, this::processStoreRequest);
+    }
+
+    private void processStoreRequest(Event event, Socket socket) {
+        StoreRequest storeRequest = (StoreRequest) event;
+        log.info(() -> "Received store request...");
+        String fileName = storeRequest.getFileName();
+        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+        byte[] data = storeRequest.getData();
+        storeRequest.getRoutingPath().add(myHexID);
+
+        PeerInfo closestPeer = closestOverallPeer(fileHex);
+        if (closestPeer != null && isCloser(fileHex, closestPeer.getHexID(), myHexID)) {
+            log.info(() -> "Forwarding request to closer peer -> " + closestPeer.getHexID());
+            send(closestPeer, storeRequest);
+            return;
+        }
+
+        log.info(() -> "Storing data. Sending store response back to data node...");
+        storeData(fileName, data);
+        StoreResponse storeResponse = new StoreResponse(Protocol.STORE_RESPONSE, storeRequest.getRoutingPath());
+        send(storeRequest.getDataNode(), storeResponse);
+    }
+
+    private void storeData(String fileName, byte[] data) {
+        try {
+            Path path = dataDir.resolve(fileName);
+            Files.write(path, data);
+        } catch (IOException e) {
+            warning.accept(e);
+        }
     }
 
     private void processRoutingUpdate(Event event, Socket socket) {
@@ -413,11 +450,16 @@ public class Peer implements Node {
             }
     }
 
-    private void startNode() {
+    @Override
+    public void startNode() {
         try(ServerSocket serverSocket = new ServerSocket(0)) {
             myPeerInfo = new PeerInfo(myHexID, new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Peer.class.getName() + "[" + myPeerInfo.toString() + "]");
             register();
+
+            // create directory in tmp
+            dataDir = Paths.get("/tmp/" + myHexID);
+            Files.createDirectories(dataDir);
 
             while(running) {
                 Socket clientSocket = serverSocket.accept();
@@ -462,12 +504,17 @@ public class Peer implements Node {
             notifyReferences();
             log.info(() -> "Exit complete...");
         }
-        for(TCPConnection conn : peerToConn.values()){
+        for(TCPConnection conn : peerToConn.values()) {
             try {
                 conn.socket.close();
             } catch (IOException e) {
                 warning.accept(e);
             }
+        }
+        try{
+            Files.deleteIfExists(dataDir);
+        } catch(IOException e) {
+            warning.accept(e);
         }
         System.exit(0);
     }
@@ -491,6 +538,17 @@ public class Peer implements Node {
         commands.put("leaf-set", this::printLeafset);
         commands.put("routing-table", this::printRoutingTable);
         commands.put("print-connections", this::printConnections);
+        commands.put("list-files", this::listFiles);
+    }
+
+    private void listFiles() {
+        try(Stream<Path> stream = Files.list(dataDir)){
+            stream.forEach(file -> {
+                System.out.println(file.getFileName() + ", " + c.convertBytesToHex(Converter.hash16(file.getFileName().toString())));
+            });
+        } catch (IOException e) {
+            warning.accept(e);
+        }
     }
 
     private void printConnections() {
@@ -513,7 +571,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
