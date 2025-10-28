@@ -82,6 +82,26 @@ public class Peer implements Node {
         events.put(Protocol.HANDSHAKE, this::processHandshake);
         events.put(Protocol.ROUTING_UPDATE, this::processRoutingUpdate);
         events.put(Protocol.STORE_REQUEST, this::processStoreRequest);
+        events.put(Protocol.RETRIEVE_REQUEST, this::processRetrieveRequest);
+    }
+
+    private void processRetrieveRequest(Event event, Socket socket) {
+        RetreiveRequest retrieveRequest = (RetreiveRequest) event;
+        log.info(() -> "Received retrieve request...");
+        String fileName = retrieveRequest.getFileName();
+        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+        retrieveRequest.getRoutingPath().add(myHexID);
+
+        PeerInfo closestPeer = closestOverallPeer(fileHex);
+        if (closestPeer != null && isCloser(fileHex, closestPeer.getHexID(), myHexID)) {
+            log.info(() -> "Forwarding request to closer peer -> " + closestPeer.getHexID());
+            send(closestPeer, retrieveRequest);
+            return;
+        }
+
+        log.info(() -> "Retrieving data. Sending retrieve response back to data node...");
+        RetrieveResponse retrieveResponse = new RetrieveResponse(Protocol.RETRIEVE_RESPONSE, retrieveRequest.getRoutingPath());
+        send(retrieveRequest.getDataNode(), retrieveResponse);
     }
 
     private void processStoreRequest(Event event, Socket socket) {

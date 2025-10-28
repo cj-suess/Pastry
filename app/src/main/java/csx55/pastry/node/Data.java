@@ -49,8 +49,19 @@ public class Data implements Node {
     private void startEvents() {
         events = Map.of(
             Protocol.ENTRY_NODE, this::processEntryNode,
-            Protocol.STORE_RESPONSE, this::processStoreResponse
+            Protocol.STORE_RESPONSE, this::processStoreResponse,
+            Protocol.RETRIEVE_RESPONSE, this::processRetrieveResponse
         );
+    }
+
+    private void processRetrieveResponse(Event event, Socket socket) {
+        log.info(() -> "Received retrieve response....");
+        RetrieveResponse retrieveResponse = (RetrieveResponse) event;
+        for(String s : retrieveResponse.getRoutingPath()) {
+            System.out.println(s);
+        }
+        System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
+        System.exit(0);
     }
 
     private void processStoreResponse(Event event, Socket socket) {
@@ -123,7 +134,6 @@ public class Data implements Node {
         } catch(IOException e) {
             warning.accept(e);
         }
-
     }
 
     private void sendRequest(Event event,  PeerInfo peerInfo) {
@@ -138,7 +148,15 @@ public class Data implements Node {
     }
 
     private void retrieve(PeerInfo peerInfo) {
-
+        try {
+            Path path = Paths.get(filePath);
+            String fileName = path.getFileName().toString();
+            byte[] data = Files.readAllBytes(path);
+            RetreiveRequest retreiveRequest = new RetreiveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
+            sendRequest(retreiveRequest, peerInfo);
+        } catch(IOException e) {
+            warning.accept(e);
+        }
     }
 
     public static void main(String[] args) {

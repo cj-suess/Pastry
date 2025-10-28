@@ -53,6 +53,8 @@ public class EventFactory {
                     return readStoreRequest(messageType, dis);
                 case Protocol.STORE_RESPONSE:
                     return readStoreResponse(messageType, dis);
+                case Protocol.RETRIEVE_REQUEST:
+                    return readRetreiveRequest(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -64,18 +66,25 @@ public class EventFactory {
         return null;
     }
 
+    private RetreiveRequest readRetreiveRequest(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo dataNode = readPeerInfo(dis);
+        String fileName = readString(dis);
+        List<String> routingPath = readRoutingPath(dis);
+        return new RetreiveRequest(messageType, dataNode, fileName, routingPath);
+    }
+
     private StoreResponse readStoreResponse(int messageType, DataInputStream dis) throws IOException {
         return new StoreResponse(messageType, readRoutingPath(dis));
     }
 
     private StoreRequest readStoreRequest(int messageType, DataInputStream dis) throws IOException {
         PeerInfo dataNode = readPeerInfo(dis);
-        String fileHex = readString(dis);
+        String fileName = readString(dis);
         int dataLength = dis.readInt();
         byte[] fileBytes = new byte[dataLength];
         dis.readFully(fileBytes);
         List<String> routingPath = readRoutingPath(dis);
-        return new StoreRequest(messageType, dataNode, fileHex, fileBytes, routingPath);
+        return new StoreRequest(messageType, dataNode, fileName, fileBytes, routingPath);
     }
 
     private List<String> readRoutingPath(DataInputStream dis) throws IOException {
