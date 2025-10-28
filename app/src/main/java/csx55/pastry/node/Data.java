@@ -148,15 +148,10 @@ public class Data implements Node {
     }
 
     private void retrieve(PeerInfo peerInfo) {
-        try {
-            Path path = Paths.get(filePath);
-            String fileName = path.getFileName().toString();
-            byte[] data = Files.readAllBytes(path);
-            RetreiveRequest retreiveRequest = new RetreiveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
-            sendRequest(retreiveRequest, peerInfo);
-        } catch(IOException e) {
-            warning.accept(e);
-        }
+        Path path = Paths.get(filePath);
+        String fileName = path.getFileName().toString();
+        RetreiveRequest retreiveRequest = new RetreiveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
+        sendRequest(retreiveRequest, peerInfo);
     }
 
     public static void main(String[] args) {
