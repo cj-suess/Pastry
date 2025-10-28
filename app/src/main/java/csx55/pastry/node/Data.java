@@ -4,8 +4,8 @@ import csx55.pastry.transport.TCPConnection;
 import csx55.pastry.util.Converter;
 import csx55.pastry.util.LogConfig;
 import csx55.pastry.wireformats.*;
-
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -26,13 +25,12 @@ public class Data implements Node {
     private Logger log = Logger.getLogger(this.getClass().getName());
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
-    private final Object lock = new Object();
     private final Converter c = Converter.getConverter();
 
-    private boolean running = true;
     private final ConnInfo discConnInfo;
     private final String mode;
     private final String filePath;
+    private PeerInfo myPeerInfo;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
@@ -43,13 +41,23 @@ public class Data implements Node {
         discConnInfo = new ConnInfo(discHost, discPort);
         this.mode = mode;
         this.filePath = filePath;
+        this.myPeerInfo = null;
         startEvents();
     }
 
     private void startEvents() {
         events = Map.of(
-            Protocol.ENTRY_NODE, this::processEntryNode
+            Protocol.ENTRY_NODE, this::processEntryNode,
+            Protocol.STORE_RESPONSE, this::processStoreResponse
         );
+    }
+
+    private void processStoreResponse(Event event, Socket socket) {
+        StoreResponse storeResponse = (StoreResponse) event;
+        for(String s : storeResponse.getRoutingPath()) {
+            System.out.println(s);
+        }
+        System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
     }
 
     private void processEntryNode(Event event, Socket socket) {
@@ -57,9 +65,9 @@ public class Data implements Node {
         log.info(() -> "Received entry node from Discovery --> " + entryNodeMessage.peerInfo.toString());
         PeerInfo entryNode = entryNodeMessage.peerInfo;
         if(mode.equals("store")) {
-            store();
+            store(entryNode);
         } else if(mode.equals("retrieve")) {
-            retrieve();
+            retrieve(entryNode);
         }
     }
 
@@ -76,9 +84,10 @@ public class Data implements Node {
     @Override
     public void startNode() {
         try(ServerSocket serverSocket = new ServerSocket(0)){
+            myPeerInfo = new PeerInfo("", new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Data.class.getName());
             getEntryNode();
-            while(running) {
+            while(true) {
                 Socket socket = serverSocket.accept();
                 TCPConnection conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
@@ -101,19 +110,31 @@ public class Data implements Node {
         }
     }
 
-    private void store() {
+    private void store(PeerInfo peerInfo) {
         try {
             Path path = Paths.get(filePath);
             String fileName = path.getFileName().toString();
             byte[] data = Files.readAllBytes(path);
-            StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileName, data, new ArrayList<>());
+            StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, myPeerInfo, fileName, data, new ArrayList<>());
+            sendRequest(storeRequest, peerInfo);
         } catch(IOException e) {
             warning.accept(e);
         }
 
     }
 
-    private void retrieve() {
+    private void sendRequest(Event event,  PeerInfo peerInfo) {
+        try {
+            Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+            TCPConnection conn = new TCPConnection(socket, this);
+            conn.startReceiverThread();
+            conn.sender.sendData(event.getBytes());
+        } catch (IOException e){
+            warning.accept(e);
+        }
+    }
+
+    private void retrieve(PeerInfo peerInfo) {
 
     }
 

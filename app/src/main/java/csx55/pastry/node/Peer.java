@@ -101,7 +101,8 @@ public class Peer implements Node {
 
         log.info(() -> "Storing data. Sending store response back to data node...");
         storeData(fileName, data);
-        // send store response
+        StoreResponse storeResponse = new StoreResponse(Protocol.STORE_RESPONSE, storeRequest.getRoutingPath());
+        send(storeRequest.getDataNode(), storeResponse);
     }
 
     private void storeData(String fileName, byte[] data) {

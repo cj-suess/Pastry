@@ -51,6 +51,8 @@ public class EventFactory {
                     return readRoutingUpdate(messageType, dis);
                 case Protocol.STORE_REQUEST:
                     return readStoreRequest(messageType, dis);
+                case Protocol.STORE_RESPONSE:
+                    return readStoreResponse(messageType, dis);
                 default:
                     warning.accept(null);
                     break;
@@ -62,13 +64,18 @@ public class EventFactory {
         return null;
     }
 
+    private StoreResponse readStoreResponse(int messageType, DataInputStream dis) throws IOException {
+        return new StoreResponse(messageType, readRoutingPath(dis));
+    }
+
     private StoreRequest readStoreRequest(int messageType, DataInputStream dis) throws IOException {
+        PeerInfo dataNode = readPeerInfo(dis);
         String fileHex = readString(dis);
         int dataLength = dis.readInt();
         byte[] fileBytes = new byte[dataLength];
         dis.readFully(fileBytes);
         List<String> routingPath = readRoutingPath(dis);
-        return new StoreRequest(messageType, fileHex, fileBytes,  routingPath);
+        return new StoreRequest(messageType, dataNode, fileHex, fileBytes, routingPath);
     }
 
     private List<String> readRoutingPath(DataInputStream dis) throws IOException {
