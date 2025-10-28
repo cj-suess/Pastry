@@ -81,6 +81,23 @@ public class Peer implements Node {
         events.put(Protocol.REFERENCE_NOTIFICATION, this::processReferenceRemoval);
         events.put(Protocol.HANDSHAKE, this::processHandshake);
         events.put(Protocol.ROUTING_UPDATE, this::processRoutingUpdate);
+        events.put(Protocol.STORE_REQUEST, this::processStoreRequest);
+    }
+
+    private void processStoreRequest(Event event, Socket socket) {
+        StoreRequest storeRequest = (StoreRequest) event;
+        log.info(() -> "Received store request...");
+        String fileHex = storeRequest.getFileHex();
+        storeRequest.getRoutingPath().add(myHexID);
+
+        PeerInfo closestPeer = closestOverallPeer(fileHex);
+        if (closestPeer != null && isCloser(fileHex, closestPeer.getHexID(), myHexID)) {
+            log.info(() -> "Forwarding request to closer peer -> " + closestPeer.getHexID());
+            send(closestPeer, storeRequest);
+            return;
+        }
+
+        log.info(() -> "Storing data. Sending store response back to data node...");
     }
 
     private void processRoutingUpdate(Event event, Socket socket) {

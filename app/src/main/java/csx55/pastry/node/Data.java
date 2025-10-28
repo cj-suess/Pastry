@@ -8,9 +8,12 @@ import csx55.pastry.wireformats.*;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -99,10 +102,15 @@ public class Data implements Node {
     }
 
     private void store() {
-        Path path = Paths.get(filePath);
-        String fileName = path.getFileName().toString();
-        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
-        // StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileHex);
+        try {
+            Path path = Paths.get(filePath);
+            String fileName = path.getFileName().toString();
+            String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+            byte[] data = Files.readAllBytes(path);
+            StoreRequest storeRequest = new StoreRequest(Protocol.STORE_REQUEST, fileHex, data, new ArrayList<>());
+        } catch(IOException e) {
+            warning.accept(e);
+        }
 
     }
 

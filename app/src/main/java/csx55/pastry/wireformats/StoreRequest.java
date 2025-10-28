@@ -8,14 +8,14 @@ public class StoreRequest extends Event {
 
     private final int messageType;
     private final String fileHex;
-    private byte[] data;
-    private List<PeerInfo> routingPath;
+    private final byte[] data;
+    private final List<String> routingPath;
 
-    public StoreRequest(int messageType, String fileHex,  byte[] data) {
-        routingPath = new ArrayList<>();
+    public StoreRequest(int messageType, String fileHex,  byte[] data, List<String> routingPath) {
         this.messageType = messageType;
         this.fileHex = fileHex;
         this.data = data;
+        this.routingPath = routingPath;
     }
 
     @Override
@@ -27,29 +27,20 @@ public class StoreRequest extends Event {
     void marshalData(DataOutputStream dout) throws IOException {
         writeString(dout, fileHex);
         writeData(dout);
-        dout.writeInt(routingPath.size());
         writeRouting(dout);
     }
 
-    public String  getFileHex() {
-        return fileHex;
-    }
+    public byte[] getData() { return data; }
 
-    public List<PeerInfo> getRoutingPath() {
-        return routingPath;
-    }
+    public String  getFileHex() { return fileHex; }
+
+    public List<String> getRoutingPath() { return routingPath; }
 
     private void writeRouting(DataOutputStream dout) throws IOException {
         dout.writeInt(routingPath.size());
-        for (PeerInfo peerInfo : routingPath) {
-            writePeerInfo(dout, peerInfo);
+        for (String hexId : routingPath) {
+            writeString(dout, hexId);
         }
-    }
-
-    private void writePeerInfo(DataOutputStream dout, PeerInfo peerInfo) throws IOException {
-        writeString(dout, peerInfo.getHexID());
-        writeString(dout, peerInfo.getIP());
-        dout.writeInt(peerInfo.getPort());
     }
 
     private void writeData(DataOutputStream dout) throws IOException {
