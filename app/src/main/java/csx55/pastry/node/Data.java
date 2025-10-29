@@ -31,7 +31,7 @@ public class Data implements Node {
     private final String mode;
     private final String filePath;
     private PeerInfo myPeerInfo;
-    private Path dataDir;
+    private Path dataFile;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
 
@@ -61,10 +61,9 @@ public class Data implements Node {
                 System.out.println(s);
             }
 
-            Path path = dataDir.resolve(filePath); //// PICK UP HERE --> figure out how to store the file at the path
-            Files.write(path, retrieveResponse.getData());
+            Files.write(dataFile, retrieveResponse.getData());
 
-            System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
+            System.out.println(c.convertBytesToHex(Converter.hash16(dataFile.getFileName().toString())));
             System.exit(0);
         } catch (IOException e) {
             warning.accept(e);
@@ -157,9 +156,10 @@ public class Data implements Node {
 
     private void retrieve(PeerInfo peerInfo) {
         try {
-            dataDir = Paths.get(filePath);
-            String fileName = dataDir.getFileName().toString();
+            dataFile = Paths.get(filePath);
+            Path dataDir = dataFile.getParent();
             Files.createDirectories(dataDir);
+            String fileName = dataFile.getFileName().toString();
             RetrieveRequest retrieveRequest = new RetrieveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
             sendRequest(retrieveRequest, peerInfo);
         } catch(IOException e) {
