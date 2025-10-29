@@ -37,7 +37,7 @@ public class Peer implements Node {
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
     private final Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
 
-    private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
+    private final Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private final Map<String, Runnable> commands = new HashMap<>();
 
     public Peer(String host, int port, String hexID) {
@@ -82,6 +82,32 @@ public class Peer implements Node {
         events.put(Protocol.HANDSHAKE, this::processHandshake);
         events.put(Protocol.ROUTING_UPDATE, this::processRoutingUpdate);
         events.put(Protocol.STORE_REQUEST, this::processStoreRequest);
+        events.put(Protocol.RETRIEVE_REQUEST, this::processRetrieveRequest);
+    }
+
+    private void processRetrieveRequest(Event event, Socket socket){
+        RetrieveRequest retrieveRequest = (RetrieveRequest) event;
+        log.info(() -> "Received retrieve request...");
+        String fileName = retrieveRequest.getFileName();
+        String fileHex = c.convertBytesToHex(Converter.hash16(fileName));
+        retrieveRequest.getRoutingPath().add(myHexID);
+
+        PeerInfo closestPeer = closestOverallPeer(fileHex);
+        if (closestPeer != null && isCloser(fileHex, closestPeer.getHexID(), myHexID)) {
+            log.info(() -> "Forwarding request to closer peer -> " + closestPeer.getHexID());
+            send(closestPeer, retrieveRequest);
+            return;
+        }
+
+        log.info(() -> "Retrieving data. Sending retrieve response back to data node...");
+        try {
+            byte[] data = retrieveData(fileName);
+            log.info(() -> "Data retrieved --> " + data.length);
+            RetrieveResponse retrieveResponse = new RetrieveResponse(Protocol.RETRIEVE_RESPONSE, data, retrieveRequest.getRoutingPath());
+            send(retrieveRequest.getDataNode(), retrieveResponse);
+        } catch (Exception e) {
+            warning.accept(e);
+        }
     }
 
     private void processStoreRequest(Event event, Socket socket) {
@@ -103,6 +129,11 @@ public class Peer implements Node {
         storeData(fileName, data);
         StoreResponse storeResponse = new StoreResponse(Protocol.STORE_RESPONSE, storeRequest.getRoutingPath());
         send(storeRequest.getDataNode(), storeResponse);
+    }
+
+    private byte[] retrieveData(String fileName) throws IOException {
+        Path path = dataDir.resolve(fileName);
+        return Files.readAllBytes(path);
     }
 
     private void storeData(String fileName, byte[] data) {
@@ -156,6 +187,19 @@ public class Peer implements Node {
     private TCPConnection getConnection(PeerInfo peerInfo) {
         String peerHexId = peerInfo.getHexID();
         TCPConnection conn;
+
+        // adding this to try to stop peers from caching data nodes
+        if(peerHexId == null || peerHexId.isEmpty()) {
+            try{
+                Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                return conn;
+            }  catch(IOException e) {
+                warning.accept(e);
+            }
+        }
+
         synchronized(peerToConn) {
             conn = peerToConn.get(peerHexId);
             if(conn != null) { return conn; }
@@ -410,6 +454,7 @@ public class Peer implements Node {
     private void send(PeerInfo peerInfo, Event event) {
         try {
             TCPConnection conn = getConnection(peerInfo);
+            assert conn != null;
             conn.sender.sendData(event.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -417,15 +462,15 @@ public class Peer implements Node {
     }
 
     private void registerResponse(Event event, Socket socket) {
-        // log.info(() -> "Received register response from Discovery...");
-        // Message responseEvent = (Message) event; 
-        // log.info(() -> responseEvent.info);
+         log.info(() -> "Received register response from Discovery...");
+         Message responseEvent = (Message) event;
+         log.info(() -> responseEvent.info);
     }
 
     private void deregisterResponse(Event event, Socket socket) {
-        // log.info(() -> "Received deregister response from Discovery...");
-        // Message responseEvent = (Message) event;
-        // log.info(() -> responseEvent.info);
+         log.info(() -> "Received deregister response from Discovery...");
+         Message responseEvent = (Message) event;
+         log.info(() -> responseEvent.info);
     }
 
     private void register() {
