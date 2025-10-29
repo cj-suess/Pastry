@@ -102,7 +102,7 @@ public class Peer implements Node {
         log.info(() -> "Retrieving data. Sending retrieve response back to data node...");
         try {
             byte[] data = retrieveData(fileName);
-            log.info(() -> "Data retrieved...");
+            log.info(() -> "Data retrieved --> " + data.length);
             RetrieveResponse retrieveResponse = new RetrieveResponse(Protocol.RETRIEVE_RESPONSE, data, retrieveRequest.getRoutingPath());
             send(retrieveRequest.getDataNode(), retrieveResponse);
         } catch (Exception e) {
@@ -187,6 +187,19 @@ public class Peer implements Node {
     private TCPConnection getConnection(PeerInfo peerInfo) {
         String peerHexId = peerInfo.getHexID();
         TCPConnection conn;
+
+        // adding this to try to stop peers from caching data nodes
+        if(peerHexId == null || peerHexId.isEmpty()) {
+            try{
+                Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
+                conn = new TCPConnection(socket, this);
+                conn.startReceiverThread();
+                return conn;
+            }  catch(IOException e) {
+                warning.accept(e);
+            }
+        }
+
         synchronized(peerToConn) {
             conn = peerToConn.get(peerHexId);
             if(conn != null) { return conn; }

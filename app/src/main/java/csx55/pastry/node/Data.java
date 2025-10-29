@@ -32,6 +32,8 @@ public class Data implements Node {
     private final String filePath;
     private PeerInfo myPeerInfo;
 
+    private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
+
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
 
     public Data(String discHost, int discPort,  String mode, String filePath) {
@@ -100,6 +102,7 @@ public class Data implements Node {
             while(true) {
                 Socket socket = serverSocket.accept();
                 TCPConnection conn = new TCPConnection(socket, this);
+                socketToConn.put(socket, conn);
                 conn.startReceiverThread();
             }
         } catch(IOException e) {
@@ -135,6 +138,7 @@ public class Data implements Node {
         try {
             Socket socket = new Socket(peerInfo.getIP(), peerInfo.getPort());
             TCPConnection conn = new TCPConnection(socket, this);
+            socketToConn.put(socket, conn);
             conn.startReceiverThread();
             conn.sender.sendData(event.getBytes());
         } catch (IOException e){
