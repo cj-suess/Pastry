@@ -156,7 +156,7 @@ public class Data implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.WARNING);
+        LogConfig.init(Level.INFO);
         Data data = new Data(args[0], Integer.parseInt(args[1]), args[2], args[3]);
         new Thread(data::startNode, "Node-" + data.toString() + "-Server").start();
 
