@@ -4,13 +4,16 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
 
+
 public class RetrieveResponse extends Event {
 
     private final int messageType;
+    private final byte[] data;
     private final List<String> routingPath;
 
-    public RetrieveResponse(int messageType,  List<String> routingPath) {
+    public RetrieveResponse(int messageType, byte[] data,  List<String> routingPath) {
         this.messageType = messageType;
+        this.data = data;
         this.routingPath = routingPath;
     }
 
@@ -21,6 +24,7 @@ public class RetrieveResponse extends Event {
 
     @Override
     void marshalData(DataOutputStream dout) throws IOException {
+        writeData(dout);
         writeRouting(dout);
     }
 
@@ -31,5 +35,11 @@ public class RetrieveResponse extends Event {
         }
     }
 
+    private void writeData(DataOutputStream dout) throws IOException {
+        dout.writeInt(data.length);
+        dout.write(data, 0, data.length);
+    }
+
     public List<String> getRoutingPath() { return routingPath; }
+    public byte[] getData() { return data; }
 }

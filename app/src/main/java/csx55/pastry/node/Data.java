@@ -26,15 +26,11 @@ public class Data implements Node {
     private final Consumer<Exception> warning = e -> log.log(Level.WARNING, e.getMessage(), e);
 
     private final Converter c = Converter.getConverter();
-    private boolean running = true;
 
     private final ConnInfo discConnInfo;
     private final String mode;
     private final String filePath;
     private PeerInfo myPeerInfo;
-
-    private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
-    private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
 
     private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
 
@@ -101,11 +97,10 @@ public class Data implements Node {
             myPeerInfo = new PeerInfo("", new ConnInfo(InetAddress.getLocalHost().getHostAddress(), serverSocket.getLocalPort()));
             log = Logger.getLogger(Data.class.getName());
             getEntryNode();
-            while(running) {
+            while(true) {
                 Socket socket = serverSocket.accept();
                 TCPConnection conn = new TCPConnection(socket, this);
                 conn.startReceiverThread();
-                socketToConn.put(socket, conn);
             }
         } catch(IOException e) {
             warning.accept(e);

@@ -24,6 +24,8 @@ public class EventFactory {
 
             int messageType = dis.readInt();
 
+            log.info(() -> "New event received --> " + messageType);
+
             switch (messageType) {
                 case Protocol.REGISTER_REQUEST:
                 case Protocol.DEREGISTER_REQUEST:
@@ -54,7 +56,7 @@ public class EventFactory {
                 case Protocol.STORE_RESPONSE:
                     return readStoreResponse(messageType, dis);
                 case Protocol.RETRIEVE_REQUEST:
-                    return readRetreiveRequest(messageType, dis);
+                    return readRetrieveRequest(messageType, dis);
                 case Protocol.RETRIEVE_RESPONSE:
                     return readRetrieveResponse(messageType, dis);
                 default:
@@ -69,14 +71,11 @@ public class EventFactory {
     }
 
     private RetrieveResponse readRetrieveResponse(int messageType, DataInputStream dis) throws IOException {
-        return new RetrieveResponse(messageType, readRoutingPath(dis));
+        return new RetrieveResponse(messageType, readData(dis), readRoutingPath(dis));
     }
 
-    private RetrieveRequest readRetreiveRequest(int messageType, DataInputStream dis) throws IOException {
-        PeerInfo dataNode = readPeerInfo(dis);
-        String fileName = readString(dis);
-        List<String> routingPath = readRoutingPath(dis);
-        return new RetrieveRequest(messageType, dataNode, fileName, routingPath);
+    private RetrieveRequest readRetrieveRequest(int messageType, DataInputStream dis) throws IOException {
+        return new RetrieveRequest(messageType, readPeerInfo(dis), readString(dis), readRoutingPath(dis));
     }
 
     private StoreResponse readStoreResponse(int messageType, DataInputStream dis) throws IOException {
@@ -84,13 +83,14 @@ public class EventFactory {
     }
 
     private StoreRequest readStoreRequest(int messageType, DataInputStream dis) throws IOException {
-        PeerInfo dataNode = readPeerInfo(dis);
-        String fileName = readString(dis);
+        return new StoreRequest(messageType, readPeerInfo(dis), readString(dis), readData(dis), readRoutingPath(dis));
+    }
+
+    private byte[] readData(DataInputStream dis) throws IOException {
         int dataLength = dis.readInt();
-        byte[] fileBytes = new byte[dataLength];
-        dis.readFully(fileBytes);
-        List<String> routingPath = readRoutingPath(dis);
-        return new StoreRequest(messageType, dataNode, fileName, fileBytes, routingPath);
+        byte[] data = new byte[dataLength];
+        dis.readFully(data);
+        return data;
     }
 
     private List<String> readRoutingPath(DataInputStream dis) throws IOException {
@@ -168,8 +168,7 @@ public class EventFactory {
 
     private Event readRegisterRequest(int messageType, DataInputStream dis) throws IOException {
         PeerInfo peerInfo = readPeerInfo(dis);
-        Event request = messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
-        return request;
+        return messageType == Protocol.REGISTER_REQUEST ? new Register(messageType, peerInfo) : new Deregister(messageType, peerInfo);
     }
 
     private PeerInfo readPeerInfo(DataInputStream dis) throws IOException {

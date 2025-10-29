@@ -85,7 +85,7 @@ public class Peer implements Node {
         events.put(Protocol.RETRIEVE_REQUEST, this::processRetrieveRequest);
     }
 
-    private void processRetrieveRequest(Event event, Socket socket) {
+    private void processRetrieveRequest(Event event, Socket socket){
         RetrieveRequest retrieveRequest = (RetrieveRequest) event;
         log.info(() -> "Received retrieve request...");
         String fileName = retrieveRequest.getFileName();
@@ -100,8 +100,14 @@ public class Peer implements Node {
         }
 
         log.info(() -> "Retrieving data. Sending retrieve response back to data node...");
-        RetrieveResponse retrieveResponse = new RetrieveResponse(Protocol.RETRIEVE_RESPONSE, retrieveRequest.getRoutingPath());
-        send(retrieveRequest.getDataNode(), retrieveResponse);
+        try {
+            byte[] data = retrieveData(fileName);
+            log.info(() -> "Data retrieved...");
+            RetrieveResponse retrieveResponse = new RetrieveResponse(Protocol.RETRIEVE_RESPONSE, data, retrieveRequest.getRoutingPath());
+            send(retrieveRequest.getDataNode(), retrieveResponse);
+        } catch (Exception e) {
+            warning.accept(e);
+        }
     }
 
     private void processStoreRequest(Event event, Socket socket) {
@@ -123,6 +129,11 @@ public class Peer implements Node {
         storeData(fileName, data);
         StoreResponse storeResponse = new StoreResponse(Protocol.STORE_RESPONSE, storeRequest.getRoutingPath());
         send(storeRequest.getDataNode(), storeResponse);
+    }
+
+    private byte[] retrieveData(String fileName) throws IOException {
+        Path path = dataDir.resolve(fileName);
+        return Files.readAllBytes(path);
     }
 
     private void storeData(String fileName, byte[] data) {
@@ -430,6 +441,7 @@ public class Peer implements Node {
     private void send(PeerInfo peerInfo, Event event) {
         try {
             TCPConnection conn = getConnection(peerInfo);
+            assert conn != null;
             conn.sender.sendData(event.getBytes());
         } catch(IOException e) {
             warning.accept(e);
@@ -437,15 +449,15 @@ public class Peer implements Node {
     }
 
     private void registerResponse(Event event, Socket socket) {
-        // log.info(() -> "Received register response from Discovery...");
-        // Message responseEvent = (Message) event; 
-        // log.info(() -> responseEvent.info);
+         log.info(() -> "Received register response from Discovery...");
+         Message responseEvent = (Message) event;
+         log.info(() -> responseEvent.info);
     }
 
     private void deregisterResponse(Event event, Socket socket) {
-        // log.info(() -> "Received deregister response from Discovery...");
-        // Message responseEvent = (Message) event;
-        // log.info(() -> responseEvent.info);
+         log.info(() -> "Received deregister response from Discovery...");
+         Message responseEvent = (Message) event;
+         log.info(() -> responseEvent.info);
     }
 
     private void register() {
