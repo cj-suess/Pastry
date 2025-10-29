@@ -192,7 +192,7 @@ public class Discover implements Node {
     }
 
     public static void main(String[] args) {
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Discover discovery = new Discover(Integer.parseInt(args[0]));
         new Thread(discovery::startNode).start();
         new Thread(discovery::readTerminal).start();

@@ -31,6 +31,7 @@ public class Data implements Node {
     private final String mode;
     private final String filePath;
     private PeerInfo myPeerInfo;
+    private Path dataDir;
 
     private final Map<Socket, TCPConnection> socketToConn = new ConcurrentHashMap<>();
 
@@ -53,13 +54,21 @@ public class Data implements Node {
     }
 
     private void processRetrieveResponse(Event event, Socket socket) {
-        log.info(() -> "Received retrieve response....");
-        RetrieveResponse retrieveResponse = (RetrieveResponse) event;
-        for(String s : retrieveResponse.getRoutingPath()) {
-            System.out.println(s);
+        try {
+            log.info(() -> "Received retrieve response....");
+            RetrieveResponse retrieveResponse = (RetrieveResponse) event;
+            for(String s : retrieveResponse.getRoutingPath()) {
+                System.out.println(s);
+            }
+
+            Path path = dataDir.resolve(filePath); //// PICK UP HERE --> figure out how to store the file at the path
+            Files.write(path, retrieveResponse.getData());
+
+            System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
+            System.exit(0);
+        } catch (IOException e) {
+            warning.accept(e);
         }
-        System.out.println(c.convertBytesToHex(Converter.hash16(Paths.get(filePath).getFileName().toString())));
-        System.exit(0);
     }
 
     private void processStoreResponse(Event event, Socket socket) {
@@ -147,15 +156,20 @@ public class Data implements Node {
     }
 
     private void retrieve(PeerInfo peerInfo) {
-        Path path = Paths.get(filePath);
-        String fileName = path.getFileName().toString();
-        RetrieveRequest retrieveRequest = new RetrieveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
-        sendRequest(retrieveRequest, peerInfo);
+        try {
+            dataDir = Paths.get(filePath);
+            String fileName = dataDir.getFileName().toString();
+            Files.createDirectories(dataDir);
+            RetrieveRequest retrieveRequest = new RetrieveRequest(Protocol.RETRIEVE_REQUEST, myPeerInfo, fileName, new ArrayList<>());
+            sendRequest(retrieveRequest, peerInfo);
+        } catch(IOException e) {
+            warning.accept(e);
+        }
     }
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Data data = new Data(args[0], Integer.parseInt(args[1]), args[2], args[3]);
         new Thread(data::startNode, "Node-" + data.toString() + "-Server").start();
 

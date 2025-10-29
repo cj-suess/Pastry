@@ -37,7 +37,7 @@ public class Peer implements Node {
     private final Map<String, TCPConnection> peerToConn = new ConcurrentHashMap<>();
     private final Set<PeerInfo> references = ConcurrentHashMap.newKeySet();
 
-    private Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
+    private final Map<Integer, BiConsumer<Event, Socket>> events = new HashMap<>();
     private final Map<String, Runnable> commands = new HashMap<>();
 
     public Peer(String host, int port, String hexID) {
@@ -616,7 +616,7 @@ public class Peer implements Node {
 
     public static void main(String[] args) {
 
-        LogConfig.init(Level.INFO);
+        LogConfig.init(Level.WARNING);
         Peer peer;
         peer = (args.length > 2) ? new Peer(args[0], Integer.parseInt(args[1]), args[2]) : new Peer(args[0], Integer.parseInt(args[1]));
         new Thread(peer::startNode, "Node-" + peer.toString() + "-Server").start();
